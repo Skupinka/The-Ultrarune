@@ -1,3 +1,3 @@
-Web simulator jumpgate 
+Web jumpgate simulator  
 ----------------------------
 Author:Skupin27
