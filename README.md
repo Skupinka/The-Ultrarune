@@ -1,3 +1,3 @@
 Web jumpgate simulator  
 ----------------------------
-Author:Skupin27
+Author:@Skupin27
