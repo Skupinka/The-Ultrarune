@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Ultrarune — Gate Control</title>
+<style>
+:root{--ink:#d3dfeb;--ink2:#7f97b0;--hd:#fff;--fill:rgba(150,180,210,.14);--hi:#8fd8ff;--sphere:#02050a;--pn:#0e1823;--pt:#cfdbe8;--pl:#3a516a;--bad:#ff6b6b;--ok:#6dffb0;
+ --bgf:radial-gradient(circle at 50% 45%,#44607a,#26394d 55%,#16222f);--g1:rgba(200,220,240,.06);--g2:rgba(200,220,240,.13);--glowf:drop-shadow(0 0 2px rgba(143,216,255,.45))}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--pn);color:var(--pt);font:12px "Courier New",ui-monospace,monospace}
+body{display:flex;min-height:100vh}
+.sheet{flex:none;width:min(calc(100vw - 360px),100vh);aspect-ratio:1;position:relative;
+ background:linear-gradient(var(--g2) 1px,transparent 1px) 0 0/10% 10%,linear-gradient(90deg,var(--g2) 1px,transparent 1px) 0 0/10% 10%,
+ linear-gradient(var(--g1) 1px,transparent 1px) 0 0/2.5% 2.5%,linear-gradient(90deg,var(--g1) 1px,transparent 1px) 0 0/2.5% 2.5%,var(--bgf)}
+.sheet.alarm::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 4px var(--bad),inset 0 0 70px color-mix(in srgb,var(--bad) 40%,transparent);animation:bl 1s steps(2) infinite}
+@keyframes bl{50%{opacity:.25}}
+svg{width:100%;height:100%;display:block}
+.l,.d,.f{stroke:var(--ink);stroke-width:1.1;fill:none}
+.d{stroke:var(--ink2);stroke-width:.7}.f{fill:var(--fill)}
+.g{filter:var(--glowf)}
+.tx{stroke:var(--ink);stroke-width:1.5;opacity:.5;stroke-dasharray:5 1.5 3 1.5 7 1.5}
+.t{fill:var(--ink);font-size:8.5px}.h{fill:var(--hd);font-size:9px;font-weight:700;letter-spacing:.1em}.ti{fill:var(--hd);font-size:15px;font-weight:700;letter-spacing:.2em}
+.mod .lp{fill:var(--ok);stroke:none;filter:drop-shadow(0 0 3px var(--ok))}.mod.off .lp{fill:#2a3a48;filter:none}.mod.fault .lp{fill:var(--bad);filter:drop-shadow(0 0 3px var(--bad))}
+.sheet::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle,transparent 58%,rgba(2,6,12,.55))}
+.mod{cursor:pointer;outline:none}.mod .f{transition:fill .2s,stroke .2s}
+.mod.live .f{fill:color-mix(in srgb,var(--hi) calc(var(--ch,0)*55%),var(--fill))}
+.mod:hover .f,.mod:focus-visible .f{fill:color-mix(in srgb,var(--hi) 40%,var(--fill))}
+.mod.sel .f{stroke:var(--hd);stroke-width:2}
+.mod.off{opacity:.3}
+.mod.fault .f{stroke:var(--bad);stroke-width:2;animation:bl .6s steps(2) infinite}
+aside{flex:1;min-width:360px;max-height:100vh;overflow:auto;padding:12px;display:grid;gap:12px;align-content:start;border-left:3px solid #000;background:#141a21;font-family:Arial,Helvetica,sans-serif}
+section{position:relative;padding:14px 14px 12px;border:1px solid #000;border-radius:3px;box-shadow:inset 0 1px 0 #fff2,0 2px 5px #000a;
+ background:radial-gradient(circle,#d0d8e0 0 1.5px,#4a525b 2.5px,transparent 3.5px) 5px 5px/9px 9px no-repeat,radial-gradient(circle,#d0d8e0 0 1.5px,#4a525b 2.5px,transparent 3.5px) calc(100% - 5px) 5px/9px 9px no-repeat,
+ radial-gradient(circle,#d0d8e0 0 1.5px,#4a525b 2.5px,transparent 3.5px) 5px calc(100% - 5px)/9px 9px no-repeat,radial-gradient(circle,#d0d8e0 0 1.5px,#4a525b 2.5px,transparent 3.5px) calc(100% - 5px) calc(100% - 5px)/9px 9px no-repeat,
+ repeating-linear-gradient(90deg,#0000 0 2px,#ffffff06 2px 3px),linear-gradient(#2c343e,#1d242c)}
+h1{font-size:14px;margin:0;letter-spacing:.2em;color:#eef2f6;text-shadow:0 1px 0 #000}
+h2{display:inline-block;margin:0 0 10px;padding:3px 9px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#e9eef4;background:#07090c;border:1px solid #000;box-shadow:inset 0 0 0 1px #3a424b}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+small{display:block;color:#8d9db0;font-size:10px;margin-top:6px}
+b{font-weight:700}
+button{font:inherit;color:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible+i,input:focus-visible{outline:2px solid var(--hi);outline-offset:2px}
+.lcd{display:inline-block;min-width:6ch;padding:2px 6px;text-align:right;font:700 12px "Courier New",monospace;background:#06130a;color:#7dff9a;border:1px solid #000;box-shadow:inset 0 1px 4px #000,0 0 0 1px #3a424b;text-shadow:0 0 5px #3f9}
+.lcd.bad{background:#160606;color:#ff6b6b;text-shadow:0 0 5px #f33}
+#banner{min-height:38px;padding:10px;text-align:center;font-weight:700;font-size:11px;letter-spacing:.18em;background:#05140b;color:#7dff9a;border:2px solid #000;box-shadow:inset 0 0 18px #0f5a30,0 0 0 1px #4a525b;text-shadow:0 0 8px #3f9}
+#banner.bad{background:#2a0505;color:#ff8080;text-shadow:0 0 8px #f33;box-shadow:inset 0 0 18px #a01010,0 0 0 1px #4a525b;animation:bl 1s steps(2) infinite}
+.mstr{display:flex;gap:14px;align-items:center}.mc{flex:1;display:grid;gap:8px}.scw{display:grid;justify-items:center;gap:12px;padding:6px 8px 0}.scw small{margin:0;font-weight:700;letter-spacing:.1em;color:#e8b800}
+#sc{width:84px;height:84px;border-radius:50%;border:0;padding:0;background:radial-gradient(circle at 38% 30%,#ff9088,#d81f15 45%,#760904);box-shadow:0 0 0 6px #e8b800,0 0 0 9px #111,0 8px 0 #5a0702,0 11px 8px #000a;transition:.12s}
+#sc.latched{transform:translateY(6px);filter:brightness(.75);box-shadow:0 0 0 6px #e8b800,0 0 0 9px #111,0 2px 0 #5a0702}
+.pb{--c:#2fbf6a;min-width:80px;padding:10px 8px;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#dfe7ee;
+ background:linear-gradient(#fff2,#0004),color-mix(in srgb,var(--c) 30%,#1a1e23);border:2px solid #0a0d10;border-radius:4px;box-shadow:inset 0 1px 0 #fff3,0 0 0 2px #4a525b,0 3px 0 #000;transition:.1s}
+.pb.lit{color:#04100a;background:linear-gradient(#fff6,#0002),var(--c);box-shadow:inset 0 1px 0 #fff6,0 0 0 2px #4a525b,0 3px 0 #000,0 0 16px var(--c)}
+.pb:active:not(:disabled){transform:translateY(3px);box-shadow:inset 0 1px 0 #fff3,0 0 0 2px #4a525b,0 0 0 #000}
+.pb.red{--c:#e5483f}.pb.amb{--c:#f0a92a}.btns{display:flex;gap:10px;justify-content:space-around;margin-top:10px}
+.tabs{display:flex;gap:6px}.tabs button{flex:1;padding:9px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#9fb0c2;background:#11161c;border:2px solid #000;box-shadow:inset 0 1px 0 #fff2,0 0 0 1px #4a525b}
+.tabs button.on{color:#7dff9a;background:#06130a;text-shadow:0 0 6px #3f9;box-shadow:inset 0 0 10px #0f5a30,0 0 0 1px #4a525b}
+.pane{display:grid;gap:12px}.pane[hidden]{display:none}
+.tgw{display:grid;justify-items:center;gap:6px;font-size:9px;letter-spacing:.1em;color:#b8c4d0}
+.tg{position:relative;display:block;width:34px;height:54px;cursor:pointer}.tg input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.tg i{position:absolute;inset:0;border-radius:6px;background:linear-gradient(90deg,#14181d,#3a424b 50%,#14181d);border:1px solid #000;box-shadow:0 0 0 2px #4a525b}
+.tg i::before{content:"";position:absolute;left:10px;top:20px;width:12px;height:14px;border-radius:50%;background:#050607;box-shadow:inset 0 0 4px #000}
+.tg i::after{content:"";position:absolute;left:12px;top:27px;width:8px;height:22px;border-radius:4px 4px 2px 2px;background:linear-gradient(90deg,#808890,#f2f5f8 45%,#6a727a);box-shadow:0 3px 3px #000a;transition:.12s}
+.tg input:checked+i::after{top:4px;box-shadow:0 -3px 3px #000a}
+.ctl{display:flex;justify-content:space-around;align-items:flex-end}
+.fb{display:flex;justify-content:space-around;gap:6px}.fd{display:grid;justify-items:center;gap:6px;font-size:9px;letter-spacing:.1em;color:#b8c4d0}
+.fd b{text-align:center}.trk{position:relative;width:46px;height:150px}
+.trk::before,.trk::after{content:"";position:absolute;top:9px;bottom:9px;width:7px;background:repeating-linear-gradient(#aab6c2 0 1px,#0000 1px 12.4px)}.trk::before{left:0}.trk::after{right:0}
+.trk input{position:absolute;left:50%;top:50%;width:150px;height:30px;margin:-15px 0 0 -75px;transform:rotate(-90deg);appearance:none;-webkit-appearance:none;background:none}
+.trk input::-webkit-slider-runnable-track{height:7px;background:#000;border:1px solid #4a525b;border-radius:3px;box-shadow:inset 0 1px 3px #000}
+.trk input::-moz-range-track{height:7px;background:#000;border:1px solid #4a525b;border-radius:3px}
+.trk input::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:18px;height:28px;margin-top:-12px;border-radius:2px;border:1px solid #000;background:linear-gradient(90deg,#1b1f24,#6c747c 40%,#d6dce2 50%,#6c747c 60%,#1b1f24);box-shadow:0 2px 4px #000}
+.trk input::-moz-range-thumb{width:16px;height:26px;border-radius:2px;border:1px solid #000;background:linear-gradient(90deg,#1b1f24,#6c747c 40%,#d6dce2 50%,#6c747c 60%,#1b1f24)}
+.dials{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px 6px}.dl{display:grid;justify-items:center;gap:4px}.dl svg{width:100%;max-width:118px}
+.dl b{font-size:9px;letter-spacing:.12em;color:#b8c4d0;text-align:center}
+.bz{fill:#aeb8c2;stroke:#20262d;stroke-width:1.5}.fc{fill:#0b0f13;stroke:#000;stroke-width:2}.tk{stroke:#d3dbe3;stroke-width:.8}.tk.mj{stroke-width:1.7}
+.zr{fill:none;stroke:#e03a3a;stroke-width:3.5}.dt{fill:#8fa0b3;font:6px Arial;text-anchor:middle}.gl{fill:#fff;opacity:.07}.hub{fill:#4a525b;stroke:#000}
+.nd{transform-origin:50px 50px;transition:transform .45s cubic-bezier(.3,1.5,.5,1)}.nd line{stroke:#ffb347;stroke-width:1.8;stroke-linecap:round}
+.mk{transform-origin:50px 50px;transition:transform .45s}.mk polygon{fill:#5fd0ff}
+.bar{height:12px;border:2px solid #000;background:#06130a;position:relative;box-shadow:0 0 0 1px #4a525b}.bar i{display:block;height:100%;width:0;background:#7dff9a;box-shadow:0 0 8px #3f9}
+.bar::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,#0000 0 8px,#06130a 8px 10px)}
+.ann{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.al{position:relative;padding:6px 6px 6px 18px;font-size:9.5px;line-height:1.25;letter-spacing:.03em;color:#8cf5ad;background:#07170d;border:2px solid #000;box-shadow:inset 0 0 8px #000,0 0 0 1px #3a424b;text-shadow:0 0 4px #2f8}
+.al::before{content:"";position:absolute;left:6px;top:8px;width:6px;height:6px;border-radius:50%;background:#4dff8a;box-shadow:0 0 6px #4dff8a}
+.al.x{color:#ffb0b0;background:#3a0a0a;text-shadow:0 0 4px #f33;animation:bl 1s steps(2) infinite}.al.x::before{background:#ff3b3b;box-shadow:0 0 8px #f33}
+.mods{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mods button{position:relative;height:50px;padding:30px 0 0;font-size:9px;font-weight:700;letter-spacing:.06em;color:#cfd8e0;background:#0a0d11;border:1px solid #000;border-radius:2px;box-shadow:inset 0 0 0 2px #262d35}
+.mods button::before{content:"";position:absolute;left:50%;margin-left:-6px;top:5px;width:12px;height:15px;border-radius:2px;background:linear-gradient(90deg,#808890,#eef2f5 45%,#6a727a);box-shadow:0 2px 2px #000}
+.mods button::after{content:"";position:absolute;right:5px;top:5px;width:5px;height:5px;border-radius:50%;background:#4dff8a;box-shadow:0 0 5px #4dff8a}
+.mods button.off::before{top:15px;filter:brightness(.55)}.mods button.off::after{background:#24352a;box-shadow:none}
+.mods button.fault{color:#ff8080}.mods button.fault::before{top:10px;background:linear-gradient(90deg,#7a1410,#ff6a60 45%,#7a1410)}.mods button.fault::after{background:#ff3b3b;box-shadow:0 0 6px #f33}
+.mods button.wn::after{background:#ffb02e;box-shadow:0 0 5px #ffb02e}.mod.wn .lp{fill:#ffb02e;filter:drop-shadow(0 0 3px #ffb02e)}
+.mods button.sel{outline:1px solid #fff;outline-offset:1px}
+#detail{margin-top:10px;padding:8px;background:#0a0d11;border:1px solid #000;box-shadow:inset 0 0 0 2px #262d35;font-size:11px;color:#cfd8e0}#detail .pb{width:100%;margin-top:6px}
+#log{height:120px;overflow:auto;font:11px/1.5 "Courier New",monospace;padding:6px;color:#7dff9a;background:repeating-linear-gradient(#0000 0 2px,#0004 2px 3px),#040a06;border:2px solid #000;box-shadow:inset 0 0 18px #000,0 0 0 1px #4a525b;text-shadow:0 0 4px #2f8}
+#log div{border-bottom:1px dotted #1d4a2c}#log .e{color:#ff8080;text-shadow:0 0 4px #f33}
+@media(max-width:900px){body{flex-direction:column}.sheet{width:100vw}aside{max-height:none;border:0}}
+#mg{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.65);z-index:9;font-family:Arial,sans-serif}#mg.on{display:grid}.mgp{width:min(420px,92vw)}
+#mgb{position:relative;height:34px;margin:12px 0;background:#06130a;border:2px solid #000;box-shadow:inset 0 0 12px #000,0 0 0 1px #4a525b}
+#mgz{position:absolute;top:0;bottom:0;background:rgba(80,255,140,.3);border:1px solid #7dff9a;box-shadow:0 0 8px #3f9}
+#mgm{position:absolute;top:-4px;bottom:-4px;width:4px;background:#ffb347;box-shadow:0 0 8px #ffb347}
+body{display:grid;grid-template-columns:minmax(340px,400px) minmax(0,1fr) minmax(360px,420px);height:100vh;overflow:hidden;background:radial-gradient(ellipse at 50% 0,#222c37,#0b0f14 70%)}
+body::before{content:"";position:fixed;top:0;left:15%;right:15%;height:3px;background:linear-gradient(90deg,#0000,#d8ecff,#0000);box-shadow:0 0 30px 6px #8fd8ff44;z-index:5}
+aside{min-width:0;height:100vh;max-height:none;padding:14px 12px 60px;border:0;background:linear-gradient(#1a2129,#0d1116);box-shadow:inset 0 0 40px #000}
+#L{border-right:6px ridge #29313b}#R{border-left:6px ridge #29313b}
+.mid{display:grid;grid-template-rows:auto auto;place-content:center;justify-items:center;gap:14px;padding:22px;min-width:0}
+.sheet{width:min(100%,calc(100vh - 110px));box-shadow:0 0 0 12px #10151b,0 0 0 15px #3a424b,0 0 70px #000,inset 0 0 60px #0008}
+.plate{font:700 10px Arial;letter-spacing:.3em;color:#9fb0c2;background:#07090c;padding:5px 14px;border:1px solid #000;box-shadow:inset 0 0 0 1px #3a424b}
+.cplate{text-align:center;font:700 11px Arial;letter-spacing:.3em;color:#e8eef4;background:#07090c;padding:7px;border:1px solid #000;box-shadow:inset 0 0 0 1px #3a424b,0 0 12px #000}
+.comp{background:#1b2128}.crt{padding:12px;font:12px "Courier New",monospace;color:#7dff9a;text-shadow:0 0 4px #2f8;border:12px solid #12161b;border-radius:16px;
+ background:repeating-linear-gradient(#0000 0 2px,#0004 2px 3px),radial-gradient(#0c2c18,#03100a);box-shadow:inset 0 0 50px #000,0 0 0 2px #000,0 0 22px #1f9d5a55}
+.th{display:flex;justify-content:space-between;gap:8px;margin:3px 0}.tl{margin:10px 0 4px;padding-top:5px;border-top:1px dashed #1d6b3f;font-size:10px;letter-spacing:.14em;color:#4fbf7e}
+.crt small{color:#4fbf7e;margin-top:8px}.crt #log{height:150px;border:0;box-shadow:none;background:none;padding:0}
+.ml{display:block;width:100%;text-align:left;background:none;border:0;color:#7dff9a;font:12px "Courier New",monospace;text-shadow:0 0 4px #2f8;padding:4px 6px}
+.ml::before{content:"> "}.ml:hover:not(:disabled){background:#7dff9a;color:#041008;text-shadow:none}.ml:disabled{opacity:.4;cursor:default}
+.stand{width:100px;height:18px;margin:6px auto 0;background:linear-gradient(90deg,#14181d,#454e58,#14181d);clip-path:polygon(15% 0,85% 0,100% 100%,0 100%)}
+@media(max-width:1250px){body{grid-template-columns:1fr;height:auto;overflow:auto}.mid{order:-1;padding:10px}.sheet{width:min(100%,100vw)}aside{height:auto}}
+body{grid-template-columns:minmax(320px,360px) minmax(0,1fr) minmax(340px,380px)}
+.mid{padding:12px 10px;gap:8px}
+.sheet{width:min(100%,calc(100vh - 66px));box-shadow:0 0 0 7px #10151b,0 0 0 9px #3a424b,0 0 50px #000,inset 0 0 60px #0008}
+.vbar{display:flex;gap:10px;align-items:center}
+#gh{font:700 10px Arial;letter-spacing:.14em;color:#dfe7ee;background:#1c232b;border:1px solid #000;padding:5px 10px;box-shadow:inset 0 1px 0 #fff3,0 0 0 1px #4a525b}#gh:hover{background:#2a3440}
+body.min{grid-template-columns:minmax(340px,1fr) minmax(360px,1fr)}
+body.min .mid{position:fixed;right:18px;bottom:18px;z-index:20;padding:0;gap:8px;display:flex;flex-direction:column-reverse;align-items:flex-end}
+body.min .sheet{width:230px;box-shadow:0 0 0 3px #10151b,0 0 0 4px #3a424b,0 8px 30px #000}
+body.min .plate{display:none}
+@media(max-width:1250px){body,body.min{grid-template-columns:1fr;height:auto;overflow:auto}body:not(.min) .mid{order:-1;padding:10px}body:not(.min) .sheet{width:min(100%,100vw)}}
+
+/* ---- v2 UI ---- */
+body{padding-top:40px}aside{height:calc(100vh - 40px)!important;scrollbar-width:thin;scrollbar-color:#3a424b #0d1116}
+.sheet{width:min(100%,calc(100vh - 110px))}
+#bar{position:fixed;top:0;left:0;right:0;height:40px;z-index:30;display:flex;align-items:center;gap:10px;padding:0 12px;background:linear-gradient(#232c36,#10151b);border-bottom:2px solid #000;box-shadow:0 2px 14px #000a;font-family:Arial,sans-serif}
+#bar .logo{font-weight:700;font-size:12px;letter-spacing:.24em;color:#eef2f6;white-space:nowrap}
+#abar{flex:1;min-width:0;text-align:center;font:700 10px Arial;letter-spacing:.18em;padding:6px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#05140b;color:#7dff9a;border:1px solid #000;box-shadow:inset 0 0 10px #0f5a30;text-shadow:0 0 6px #3f9}
+#abar.bad{background:#2a0505;color:#ff8080;box-shadow:inset 0 0 10px #a01010;text-shadow:0 0 6px #f33;animation:bl 1s steps(2) infinite}
+#crew{display:flex;gap:5px}.pill{font:700 9px Arial;letter-spacing:.1em;padding:4px 8px;border-radius:10px;background:#0a0d11;border:1px solid #3a424b;color:#cfd8e0;white-space:nowrap}
+.pill[data-r=gate]{border-color:#5fd0ff;color:#8fd8ff}.pill[data-r=rx]{border-color:#ffb347;color:#ffc878}.pill[data-r=cmd]{border-color:#7dff9a;color:#7dff9a}.pill[data-r=obs]{color:#8d9db0}
+.chip{font:700 9px Arial;letter-spacing:.14em;padding:5px 9px;background:#07090c;border:1px solid #3a424b;color:#9fb0c2;white-space:nowrap}.chip.live{color:#7dff9a;border-color:#2f8a52}.chip.bad{color:#ff8080;border-color:#a01010}
+#bar button{font:700 10px Arial;letter-spacing:.12em;padding:6px 10px;color:#dfe7ee;background:#1c232b;border:1px solid #000;box-shadow:inset 0 1px 0 #fff3,0 0 0 1px #4a525b}#bar button:hover{background:#2a3440}
+#bsc{background:#8c1d16!important;color:#fff!important}
+#toasts{position:fixed;top:50px;left:50%;transform:translateX(-50%);z-index:50;display:grid;gap:6px;justify-items:center;pointer-events:none}
+.toast{padding:8px 14px;font:700 11px Arial;letter-spacing:.06em;color:#dfffe9;background:#06130a;border:1px solid #2f8a52;box-shadow:0 4px 18px #000c;animation:ti .25s ease-out}.toast.bad{color:#ffd0d0;background:#2a0505;border-color:#a01010}
+@keyframes ti{from{opacity:0;transform:translateY(-8px)}}
+section h2{cursor:pointer;user-select:none}section h2::after{content:" ▾";opacity:.6}section.col h2::after{content:" ▸"}section.col>*:not(h2){display:none!important}
+.pb{transition:.12s}.pb:hover:not(:disabled){filter:brightness(1.18)}
+#lob{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.7);z-index:40;font-family:Arial,sans-serif}#lob.on{display:grid}
+#lob label{font-size:10px;letter-spacing:.12em;color:#b8c4d0}#lob input,#lob select,#cin{font:700 12px "Courier New",monospace;padding:7px;background:#06130a;color:#7dff9a;border:1px solid #000;box-shadow:inset 0 1px 4px #000,0 0 0 1px #3a424b;width:56%;text-transform:uppercase}
+#mlink{width:100%;font:11px "Courier New",monospace;padding:7px;background:#06130a;color:#7dff9a;border:1px solid #000;box-shadow:inset 0 1px 4px #000,0 0 0 1px #3a424b;resize:vertical;word-break:break-all}#lob .pb{min-width:0;padding:8px 6px}#lob section{max-height:94vh;overflow:auto}
+#cin{display:none;width:100%;margin-top:6px;text-transform:none}body.mp #cin{display:block}
+#mst{display:block!important;text-align:left!important;min-height:34px;font-size:11px!important;white-space:normal}
+body.r-gate #R section:not(.comp),body.r-rx #L section:not(.mstr):not(#sys),body.r-obs aside section:not(.mstr):not(.comp){opacity:.5;pointer-events:none;filter:saturate(.5)}
+body.r-obs #sc,body.r-obs #bsc{pointer-events:none;opacity:.4}
+body.r-gate #R section:not(.comp)::after,body.r-rx #L section:not(.mstr):not(#sys)::after,body.r-obs aside section:not(.mstr):not(.comp)::after{content:"VIEW ONLY";position:absolute;right:10px;top:12px;font:700 8px Arial;letter-spacing:.16em;color:#ffb347}
+@media(max-width:700px){#crew,#bar .logo{display:none}}
+
+/* ---- v3 graphics ---- */
+.bz{fill:url(#bzg);stroke:#0a0d10}.fc{fill:url(#fcg)}.gl{fill:url(#gls);opacity:1}.hub{fill:url(#hubg)}
+.tk{stroke:#e8f0f8}.zr{filter:drop-shadow(0 0 1.5px #f33)}.nd line{filter:drop-shadow(1.5px 2px 1.2px #000c);stroke:#ffc060}.dt{fill:#9fb4c9;letter-spacing:.4px}
+.dl svg{filter:drop-shadow(0 4px 5px #000b)}
+.dl svg:hover .bz{filter:brightness(1.12)}
+section{background-image:linear-gradient(180deg,#ffffff0d,#0000 30%),repeating-linear-gradient(90deg,#0000 0 2px,#ffffff05 2px 3px)}
+h2{background:linear-gradient(#10151b,#05070a);box-shadow:inset 0 0 0 1px #3a424b,inset 3px 0 0 #5fd0ff}
+.pb:not(:disabled){background-image:linear-gradient(#ffffff40,#0000 48%,#0004);text-shadow:0 1px 0 #0008}.pb:active:not(:disabled){transform:translateY(1px);filter:brightness(.9)}
+.bar i{background-image:linear-gradient(#ffffff66,#0000 55%,#0003);transition:width .35s ease-out}
+.lcd{background-image:linear-gradient(#ffffff10,#0000 50%);animation:fl 4s infinite}@keyframes fl{0%,96%,100%{opacity:1}97%{opacity:.88}}
+.al{background-image:linear-gradient(#ffffff0a,#0000)}
+#svg{filter:drop-shadow(0 0 2px color-mix(in srgb,var(--hi) 55%,transparent)) contrast(1.06) saturate(1.12)}
+#svg circle[fill*="star"],#svg [fill="url(#star)"]{filter:drop-shadow(0 0 18px #ff9a2f) drop-shadow(0 0 50px #ff7a1a88);animation:pls 3.4s ease-in-out infinite}
+@keyframes pls{50%{filter:drop-shadow(0 0 28px #ffc060) drop-shadow(0 0 70px #ff7a1aaa)}}
+.sheet{background-blend-mode:screen}
+.sheet::before{background:radial-gradient(circle at 50% 45%,transparent 50%,rgba(2,6,12,.7)),repeating-linear-gradient(#0000 0 3px,#00000012 3px 4px)!important}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;background:repeating-linear-gradient(#0000 0 2px,#00000010 2px 3px),radial-gradient(ellipse at 50% 40%,transparent 60%,#0008)}
+.hz{filter:drop-shadow(0 4px 5px #000b)}.hzR{transform-origin:50px 50px;transition:transform .3s cubic-bezier(.3,1.4,.5,1)}.hzP{transition:transform .3s ease-out}
+.hz.hzbad .bz{stroke:#ff3b3b;filter:drop-shadow(0 0 4px #f33)}
+
+/* ---- v4 art direction ---- */
+:root{--fd:Orbitron,"Segoe UI",Arial,sans-serif;--fm:"Share Tech Mono","Courier New",monospace;--acc:#5fd0ff}
+#stars,#neb{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+#neb{background:radial-gradient(ellipse 60% 50% at 18% 12%,#1d4a8a40,transparent 70%),radial-gradient(ellipse 55% 45% at 88% 85%,#6a1f6a30,transparent 70%),radial-gradient(ellipse 40% 40% at 55% 55%,#0e3a4a30,transparent 70%)}
+aside{position:relative;z-index:1;background:linear-gradient(#1a2129ee,#0d1116f5)!important;backdrop-filter:blur(3px);scrollbar-width:thin;scrollbar-color:#3a5166 #0d1116}
+body:not(.min) .mid{position:relative;z-index:1}
+section{border-radius:7px;border-color:#000a;background-color:#18212b;background-image:linear-gradient(165deg,#ffffff14,#0000 35%,#0003),repeating-linear-gradient(90deg,#0000 0 2px,#ffffff04 2px 3px);box-shadow:inset 0 1px 0 #fff3,inset 0 0 0 1px #ffffff08,0 6px 16px #000a,0 0 0 1px #0a0e13}
+section::before{content:"";position:absolute;left:14px;right:14px;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.5}
+h2,.cplate,#bar .logo,h1{font-family:var(--fd)!important}
+h2{font-size:9.5px!important;letter-spacing:.14em!important;border-radius:3px;text-shadow:0 0 8px #5fd0ff77}
+.cplate{font-size:10px!important;letter-spacing:.34em!important;border-radius:5px;background:linear-gradient(#0c1218,#05070a)!important;text-shadow:0 0 10px var(--acc);box-shadow:inset 0 0 0 1px #3a424b,inset 0 -2px 8px #5fd0ff22,0 0 16px #000}
+.lcd,.chip,.toast{font-family:var(--fm)!important}.lcd{border-radius:3px;font-size:13px!important;text-shadow:0 0 7px #3f9,0 0 14px #3f96;box-shadow:inset 0 2px 6px #000,inset 0 0 0 1px #0d2c18,0 0 0 1px #3a424b,0 1px 0 #fff2}
+.lcd.bad{text-shadow:0 0 7px #f55,0 0 14px #f336}
+.pb{border-radius:5px!important;font-family:var(--fd);letter-spacing:.08em;box-shadow:inset 0 1px 0 #fff5,inset 0 -3px 6px #0006,0 3px 0 #000,0 6px 10px #0009!important;transition:transform .08s,filter .15s,box-shadow .15s}
+.pb.grn:not(:disabled){box-shadow:inset 0 1px 0 #fff5,inset 0 -3px 6px #0006,0 3px 0 #000,0 0 14px #2fe07a55!important}.pb.red:not(:disabled){box-shadow:inset 0 1px 0 #fff5,inset 0 -3px 6px #0006,0 3px 0 #000,0 0 14px #ff4a4a44!important}.pb.amb:not(:disabled){box-shadow:inset 0 1px 0 #fff5,inset 0 -3px 6px #0006,0 3px 0 #000,0 0 14px #ffb34744!important}
+.pb:active:not(:disabled){box-shadow:inset 0 3px 8px #000a,0 1px 0 #000!important;transform:translateY(2px)}
+.pb:disabled{opacity:.45}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#bar{background:linear-gradient(#26313dee,#0c1117f2);backdrop-filter:blur(6px);border-bottom:1px solid #5fd0ff44;box-shadow:0 2px 20px #000c,0 1px 0 #5fd0ff22}
+#bar .logo{font-size:12px;text-shadow:0 0 12px var(--acc)}
+#abar{border-radius:3px;font-family:var(--fm);font-size:11px;letter-spacing:.14em}.chip,.pill{border-radius:3px}
+#sc{box-shadow:0 0 0 4px #1b0505,0 0 0 6px #5b1a15,0 6px 14px #000c,0 0 22px #ff3b3b55!important}
+body:has(.sheet.alarm) aside{box-shadow:inset 0 0 0 1px #ff3b3b66,inset 0 0 60px #a0101055}
+body:has(.sheet.alarm) #bar{border-bottom-color:#ff3b3b}
+@media(min-width:1251px){.mid{padding:6px}.mid .sheet{width:min(calc(100vw - 840px),calc(100vh - 200px))!important;min-width:360px}}
+.sheet{border-radius:8px;box-shadow:0 0 0 10px #0d1218,0 0 0 11px #5fd0ff66,0 0 0 14px #1b232c,0 0 0 15px #000,0 0 90px #5fd0ff26,0 20px 60px #000,inset 0 0 80px #000b!important}
+.sheet::before{background-size:auto,100% 4px!important;animation:roll 9s linear infinite}@keyframes roll{to{background-position:0 0,0 40px}}
+#svg text{text-rendering:geometricPrecision}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---- minimised gate tab ---- */
+body.min .mid{right:22px;bottom:0;gap:0;flex-direction:column!important;pointer-events:none}body.min .mid>*{pointer-events:auto}
+body.min .vbar{display:block}
+body.min #gh{display:flex;align-items:center;gap:8px;padding:9px 16px 8px;font:700 10px var(--fd);letter-spacing:.2em;color:#dff3ff;background:linear-gradient(#2a3846,#10161d);border:1px solid #5fd0ff77;border-bottom:0;border-radius:10px 10px 0 0;box-shadow:0 -4px 18px #000b,0 0 18px #5fd0ff33,inset 0 1px 0 #fff3;cursor:pointer;animation:tabin .35s cubic-bezier(.3,1.4,.5,1)}
+body.min #gh::before{content:"";width:8px;height:8px;border-radius:50%;background:#6dffb0;box-shadow:0 0 8px #6dffb0}
+body.min #gh::after{content:"▲";font-size:8px;opacity:.7}
+body.min #gh:hover{background:linear-gradient(#35495c,#16202a);color:#fff}
+body:has(.sheet.alarm).min #gh::before{background:#ff4040;box-shadow:0 0 9px #f33;animation:bl 1s steps(2) infinite}
+@keyframes tabin{from{transform:translateY(100%)}}
+body.min .mid .sheet{display:none;width:280px!important;min-width:0!important;margin-bottom:6px;pointer-events:none}
+body.min .mid:hover .sheet,body.min .mid:has(:focus-visible) .sheet{display:block;animation:tabin .2s ease-out}
+
+/* ---- v5 shop, events, record ---- */
+#ups{display:grid;grid-template-columns:1fr 1fr;gap:8px}#ups .pb{display:grid;gap:3px;text-align:left;padding:8px 9px;font-size:10px;line-height:1.2}
+#ups .pb small{font:9.5px Arial;letter-spacing:0;opacity:.8}#ups .pb.own{opacity:1;border-color:#2f8a52;color:#8cf5ad;text-shadow:0 0 6px #3f9}#ups .pb .cs{font:11px var(--fm);color:#ffd27a}
+#ach{display:flex;flex-wrap:wrap;gap:6px}.ac{padding:5px 8px;font:700 9.5px Arial;letter-spacing:.06em;border-radius:3px;background:#07090c;border:1px solid #2a323b;color:#5d6b7a}.ac.on{color:#bfeaff;border-color:#5fd0ff;box-shadow:0 0 10px #5fd0ff44;text-shadow:0 0 6px #5fd0ff}
+#evc{animation:bl 1.2s steps(2) infinite}#evc.good{color:#7dff9a;border-color:#2f8a52;animation:none}#evc.bad{color:#ffb347;border-color:#ffb347}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="neb"></div><canvas id="stars"></canvas>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<linearGradient id="bzg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6ecf2"/><stop offset=".35" stop-color="#8f9aa6"/><stop offset=".6" stop-color="#c9d2da"/><stop offset="1" stop-color="#5b6570"/></linearGradient>
+<radialGradient id="fcg" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#1c2631"/><stop offset="1" stop-color="#05080b"/></radialGradient>
+<radialGradient id="hubg" cx=".35" cy=".3"><stop offset="0" stop-color="#9aa6b2"/><stop offset="1" stop-color="#1a1f25"/></radialGradient>
+<linearGradient id="gls" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b5fa8"/><stop offset="1" stop-color="#7cc4f5"/></linearGradient>
+<linearGradient id="gnd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9b6a3a"/><stop offset="1" stop-color="#3d2610"/></linearGradient>
+<clipPath id="hzc"><circle cx="50" cy="50" r="40"/></clipPath></defs></svg>
+<div id="bar"><span class="logo">◈ ULTRARUNE</span><div id="abar" role="status">ALL SYSTEMS NOMINAL</div><div id="crew"></div><span class="chip" id="evc" hidden></span><span class="chip" id="chip">SOLO</span><button id="bsc">SCRAM</button><button id="mpb">MULTIPLAYER</button></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="lob" role="dialog" aria-label="Multiplayer"><section style="width:min(440px,92vw)"><h2>Crew link</h2>
+ <div class="row"><label for="mname">CALLSIGN</label><input id="mname" maxlength="14"></div>
+ <div class="row"><label for="mrole">STATION</label><select id="mrole"><option value="cmd">Commander (all)</option><option value="gate">Gate Officer</option><option value="rx">Reactor Engineer</option><option value="obs">Observer</option></select></div>
+ <div class="row"><label for="mcode">CREW CODE</label><input id="mcode" maxlength="6"></div>
+ <div class="lcd" id="mst"></div>
+ <div class="tl" style="color:#9fb0c2;border-color:#3a424b">OTHER DEVICES (STANDALONE, NO SERVER)</div>
+ <textarea id="mlink" rows="3" spellcheck="false" aria-label="Link code" placeholder="Invite / reply code appears here — or paste one here"></textarea>
+ <div class="btns" style="margin:6px 0 10px"><button class="pb" id="minv">Create invite</button><button class="pb" id="macc">Accept reply</button><button class="pb" id="mans">Answer invite</button><button class="pb" id="mcopy">Copy</button></div>
+ <div class="btns"><button class="pb grn" id="mhost">Host</button><button class="pb amb" id="mjoin">Join</button><button class="pb red" id="mleave">Leave</button><button class="pb" id="mclose">Close</button></div>
+ <small><b>Same browser:</b> open the file in a second tab, same crew code, Join. <b>Other devices:</b> host presses Create invite and sends the code; the guest pastes it and presses Answer invite, then sends the reply code back; host pastes it and presses Accept reply. Repeat per player. One player hosts and runs the reactor simulation. Gate Officer runs the jump and ring drive, Reactor Engineer runs the star and cooling. Anyone can SCRAM, repair and chat.</small></section></div>
+<aside id="L"><div class="cplate">JUMP GATE CONTROL</div>
+  <section class="mstr"><div class="scw"><button id="sc" aria-label="SCRAM"></button><small id="scl">SCRAM</small></div>
+    <div class="mc"><div class="row"><h1>THE ULTRARUNE</h1><span class="lcd" id="clock">T+00:00</span></div>
+      <div id="banner" role="status" aria-live="polite"></div>
+      <div class="row"><div class="tgw" style="grid-auto-flow:column;gap:10px">ALARM SOUND<label class="tg" style="transform:scale(.7)"><input type="checkbox" id="snd" aria-label="Sound"><i></i></label></div></div></div></section>
+  <section><h2>Jump planner</h2><div class="fb" id="fj"></div>
+      <div class="row"><span style="font-size:10px;letter-spacing:.12em;color:#b8c4d0">JUMPS COMPLETED</span><span class="lcd" id="jc">0</span></div><div class="btns"><button class="pb amb" id="cal">Recalibrate phase</button></div><small id="jinfo"></small></section>
+    <section><h2>Jump sequence</h2>
+      <div class="row"><span class="lcd" id="stg" style="text-align:left">IDLE</span><span class="lcd" id="stp"></span></div><div class="bar" id="sbar"><i></i></div>
+      <div class="btns"><button class="pb grn" id="go">Start</button><button class="pb red" id="ab">Abort</button></div></section>
+    <section><h2>Ring drive</h2>
+      <div class="ctl"><div class="tgw"><label class="tg"><input type="checkbox" id="spin" checked aria-label="Drive engaged"><i></i></label>DRIVE ENGAGE</div><div class="fb" id="fr"></div></div>
+      <small>Ring is 80,000 km across. Animation is sped up ×40.</small></section>
+    <section><h2>Gate telemetry</h2><div id="tel"></div></section>
+    <section><h2>Gate interlocks</h2><div class="ann" id="ilk"></div></section>
+    <section id="sys"><h2>Coils &amp; systems</h2><div class="mods" id="list"></div><button id="allMods" class="pb amb" style="width:100%;margin-top:10px"></button><div id="detail"></div></section>
+<section id="shop"><h2>Ship upgrades</h2><div id="ups"></div></section>
+<section id="rec"><h2>Service record</h2><div id="ach"></div></section>
+</aside>
+<div class="mid"><main class="sheet" id="sheet"><svg id="svg" viewBox="0 0 1000 1000" role="img" aria-label="Interactive blueprint of The Ultrarune jump gate and reactor"></svg></main><div class="vbar"><div class="plate">MAIN VIEWSCREEN - GATE &amp; REACTOR SCHEMATIC</div><button id="gh" aria-label="Hide or show the gate display">HIDE GATE</button></div></div>
+<aside id="R"><section class="comp"><h2>Mission computer</h2>
+ <div class="crt">
+  <div class="th"><span>ULTRARUNE OPS TERMINAL</span><span id="cr">500 cr</span></div>
+  <div class="tl">ACTIVE CONTRACT</div>
+  <div class="th"><span id="mis">NO CONTRACT</span><span id="mt">--:--</span></div>
+  <button class="ml" id="aban">ABANDON CONTRACT (-10%)</button>
+  <div class="tl">AVAILABLE CONTRACTS - SELECT TO ACCEPT</div>
+  <div id="offers"></div>
+  <div class="tl">SYSTEM LOG</div>
+  <div id="log" role="log" aria-live="polite"></div><input id="cin" maxlength="140" placeholder="Crew comms — press Enter to send" aria-label="Crew chat">
+  <small>On-time delivery pays in full. Bonuses: clean run, tight phase control, early arrival. Failures and repairs cost credits.</small>
+ </div><div class="stand"></div></section><div class="cplate">REACTOR CONTROL</div>
+  <section><h2>Stellar reactor</h2>
+      <small style="margin:0 0 8px">Captured K-dwarf star, rated 150 YW (1 YW = 10²⁴ W, about 0.4 solar luminosities).</small>
+      <div class="row"><span style="font-size:10px;letter-spacing:.12em;color:#b8c4d0">STATE</span><span class="lcd" id="rxs">OFF</span></div>
+      <div class="btns"><button class="pb grn" id="ign">Ignite</button><button class="pb amb" id="shut">Shutdown</button><button class="pb red" id="vent">Vent</button></div></section>
+    <section><h2>Reactor controls</h2><div class="fb" id="fb"></div></section>
+    <section><h2>Reactor telemetry</h2><div id="rtel"></div></section>
+    <section><h2>Ignition checks</h2><div class="ann" id="rilk"></div></section>
+</aside>
+<div id="mg" role="dialog" aria-label="Manual repair"><section class="mgp"><h2 id="mgt">Manual repair</h2>
+ <div class="row"><span class="lcd" id="mgs" style="text-align:left;flex:1">Torque the bolt!</span><span class="lcd" id="mgk">0/5</span></div>
+ <div id="mgb"><i id="mgz"></i><i id="mgm"></i></div>
+ <div class="btns"><button class="pb grn" id="mgh">Torque</button><button class="pb red" id="mgc">Cancel</button></div>
+ <small>Hit Torque (or Space) while the marker is inside the green band. Five good bolts restore the module for free. Three stripped bolts end the job and wear it further.</small></section></div>
+<script>
+const NS="http://www.w3.org/2000/svg",$=id=>document.getElementById(id),S=$("svg");
+const el=(p,t,a,x)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(x)e.textContent=x;p.appendChild(e);return e};
+const C=(p,cx,cy,r,c="l",x={})=>el(p,"circle",{cx,cy,r,class:c,...x});
+const ln=(p,x1,y1,x2,y2,c="d")=>el(p,"line",{x1,y1,x2,y2,class:c});
+const P=(p,d,c="l")=>el(p,"path",{d,class:c});
+const RC=(p,x,y,w,h,c="f")=>el(p,"rect",{x,y,width:w,height:h,class:c});
+const T=(p,x,y,s,c="t")=>el(p,"text",{x,y,class:c},s);
+const spokes=(p,cx,cy,r1,r2,n,c="d")=>{for(let i=0;i<n;i++){const a=i*2*Math.PI/n,k=Math.cos(a),s=Math.sin(a);ln(p,cx+r1*k,cy+r1*s,cx+r2*k,cy+r2*s,c)}};
+const ticks=(p,cx,cy,r,n,s=5)=>{for(let i=0;i<n;i++){const a=i*2*Math.PI/n,r2=r+(i%s?5:10);ln(p,cx+r*Math.cos(a),cy+r*Math.sin(a),cx+r2*Math.cos(a),cy+r2*Math.sin(a))}};
+let seed=7;const rnd=()=>(seed=(seed*9301+49297)%233280)/233280;
+const gt=(p,x,y,w,n)=>{for(let i=0;i<n;i++)ln(p,x,y+i*5,x+w*(.5+.5*rnd()),y+i*5,"tx")};
+const box=(p,x,y,w,h,t,n)=>{RC(p,x,y,w,h);if(t)T(p,x+6,y+12,t,"h");gt(p,x+6,y+(t?20:8),w-14,n)};
+const dev=(p,cx,cy,r)=>{[1,.82,.58,.3].forEach(k=>C(p,cx,cy,r*k));C(p,cx,cy,r*.7,"l",{style:`stroke-width:${r*.12}px;stroke-dasharray:5 2;opacity:.5`});spokes(p,cx,cy,r*.3,r,24)};
+
+// ---------- drawing ----------
+const defs=el(S,"defs",{});const rg=el(defs,"radialGradient",{id:"hor"});
+[[0,.95],[.5,.45]].forEach(([o,a])=>el(rg,"stop",{offset:o,style:`stop-color:var(--hi);stop-opacity:${a}`}));el(rg,"stop",{offset:1,style:"stop-color:var(--sphere);stop-opacity:.9"});
+const sg=el(defs,"radialGradient",{id:"star"});[[0,"#fff3c4"],[.45,"#ffb347"],[1,"#b3410f"]].forEach(([o,c])=>el(sg,"stop",{offset:o,"stop-color":c}));
+const gr=(t,id,a,st)=>{const e=el(defs,t,{id,...a});st.forEach(([o,s])=>el(e,"stop",{offset:o,style:s}));return e};
+gr("radialGradient","disc",{},[[0,"stop-color:#0b141d;stop-opacity:.85"],[.75,"stop-color:#203246;stop-opacity:.5"],[1,"stop-color:#3d5a78;stop-opacity:.45"]]);
+gr("radialGradient","belt",{},[[.6,"stop-color:var(--hi);stop-opacity:0"],[1,"stop-color:var(--hi);stop-opacity:.14"]]);
+["h","v"].forEach(k=>gr("linearGradient","fl"+k,{gradientUnits:"userSpaceOnUse",x1:k=="h"?270:500,x2:k=="h"?730:500,y1:k=="h"?500:270,y2:k=="h"?500:730},[[0,"stop-color:var(--hi);stop-opacity:0"],[.5,"stop-color:#fff;stop-opacity:.95"],[1,"stop-color:var(--hi);stop-opacity:0"]]));
+const G=el(S,"g",{class:"g"});
+C(G,500,500,408,"l",{style:"fill:url(#belt);stroke:none"});C(G,500,500,262,"l",{style:"fill:url(#disc);stroke:none"});
+[345,300].forEach((r,i)=>C(G,500,500,r,"l",{style:`stroke-width:${i?40:56}px;opacity:.07`}));
+C(G,500,500,408);const rim=C(G,500,500,408,"l",{style:"stroke:var(--hi);stroke-width:2.5px;opacity:0"});C(G,500,500,400,"d");C(G,500,500,262);C(G,500,500,254,"d");C(G,500,500,238,"d",{style:"stroke-dasharray:2 4"});
+const ring=el(G,"g",{});C(ring,500,500,226);C(ring,500,500,206);ticks(ring,500,500,206,240);
+for(let i=0;i<24;i++)el(ring,"rect",{x:487,y:275,width:26,height:17,rx:2,class:"f",transform:`rotate(${i*15} 500 500)`});
+const eg=C(ring,500,500,216,"l",{style:"stroke:var(--hi);stroke-width:2.5px;stroke-dasharray:30 18;opacity:0"});
+C(ring,500,500,190,"l",{style:"stroke-width:16px;stroke-dasharray:12 3;opacity:.45"});
+const core=el(G,"g",{});C(core,500,500,172);C(core,500,500,152,"d");ticks(core,500,500,152,120,6);
+C(core,500,500,118,"l",{style:"stroke-width:10px;stroke-dasharray:6 3;opacity:.45"});C(core,500,500,96,"d");
+spokes(core,500,500,76,150,36);spokes(core,500,500,98,118,72,"l");
+C(G,500,500,72);C(G,500,500,64,"d");
+// aperture
+const AP=el(S,"g",{});
+C(AP,500,500,58,"l",{style:"fill:var(--sphere)"});
+const STG=el(AP,"g",{});C(STG,500,500,56,"l",{style:"fill:url(#star);stroke:none"});
+const HZ=el(AP,"g",{});C(HZ,500,500,56,"l",{style:"fill:url(#hor);stroke:none"});
+const sw=el(HZ,"g",{});[18,31,44].forEach((r,i)=>C(sw,500,500,r,"l",{style:`stroke:var(--hi);stroke-dasharray:${6+i*4} ${5+i*3};opacity:.8`}));
+const arc=C(AP,500,500,68,"l",{pathLength:100,transform:"rotate(-90 500 500)",style:"stroke:var(--hi);stroke-width:3px;stroke-dasharray:100 100;stroke-dashoffset:100"});
+
+const FL=el(AP,"g",{opacity:0,"pointer-events":"none"});
+[["h",270,500,730,500],["v",500,270,500,730]].forEach(([k,a,b,c,d])=>{const l=ln(FL,a,b,c,d,"l");l.style.stroke=`url(#fl${k})`;l.style.strokeWidth="2.4"});
+// modules
+const M=[["Primary coil","PRI",9,"Main flux winding"],["Secondary coil","SEC",8,"Trim winding"],["Capacitor bank A","CAP-A",12,"Energy storage"],["Capacitor bank B","CAP-B",12,"Energy storage"],
+["Capacitor bank C","CAP-C",12,"Energy storage"],["Capacitor bank D","CAP-D",12,"Energy storage"],["Coolant loop A","CL-A",6,"Heat rejection"],["Coolant loop B","CL-B",6,"Heat rejection"],
+["Plasma injector","INJ",10,"Feeds the reactor"],["Magnetic containment A","CON-A",9,"Magnetic confinement"],["Magnetic containment B","CON-B",9,"Magnetic confinement"],["Focus array","FOC",7,"Shapes the aperture"],
+["Emitter","EMT",6,"Opens the jump point"],["Phase tuner","TUN",5,"Aligns coil timing"],["Shield","SHD",5,"Radiation shielding"],["Vent","VNT",4,"Adds heat rejection"]].map(([n,c,p,role])=>({n,c,p,role,s:"online",h:Math.round(55+Math.random()*45)}));
+const LIVE=[0,1,2,3,4,5,9,10,11,12,13];
+const MG=el(S,"g",{});
+for(let i=0;i<16;i++){const st=el(MG,"g",{class:"g",transform:`rotate(${i*22.5+11.25} 500 500)`});P(st,"M500 252V132","d");RC(st,495,128,10,6)}
+const gs=M.map((m,i)=>{const g=el(MG,"g",{class:"mod g"+(LIVE.includes(i)?" live":""),transform:`rotate(${i*22.5} 500 500)`,tabindex:0,role:"button","aria-label":m.n});
+ P(g,"M463 244L537 244L552 140L448 140Z","f");P(g,"M456 196h88M452 168h96M500 140V244M481 140V244M519 140V244M468 222h64M462 232h76","d");
+ RC(g,468,116,64,24);RC(g,486,98,28,18);RC(g,494,84,12,14,"l");C(g,500,76,3.2,"lp");P(g,"M474 116V140M526 116V140","d");
+ RC(g,436,166,12,26);RC(g,552,166,12,26);RC(g,430,174,6,10,"l");RC(g,564,174,6,10,"l");
+ g.onclick=()=>pick(i);g.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();pick(i)}};return g});
+
+// annotations
+const A=el(S,"g",{class:"g"});T(A,500,24,"THE ULTRARUNE","ti").setAttribute("text-anchor","middle");
+dev(A,105,105,68);ln(A,37,105,173,105);ln(A,105,37,105,173);
+P(A,"M60 185l60-8 46 8 14 10-14 10-46 8-60-8z");P(A,"M80 195h90M100 182v26M140 182v26","d");RC(A,176,186,30,16);ln(A,206,195,300,220);
+P(A,"M500 44v36M486 56h28M492 70h16");C(A,500,60,5);box(A,372,38,100,34,null,4);box(A,534,38,90,26,null,3);
+dev(A,700,100,62);RC(A,680,70,40,60);P(A,"M680 90h40M680 110h40M690 70v60M710 70v60","d");box(A,792,36,188,100,"SYSTEM INDEX",12);ln(A,762,100,792,100);
+C(A,860,330,44);C(A,860,330,28,"d");P(A,"M860 306l21 12v24l-21 12-21-12v-24z");C(A,860,330,6,"f");ln(A,816,330,690,352);box(A,880,396,96,40,null,5);ln(A,920,396,890,368);
+P(A,"M930 520h50M930 530h50M955 500v50","d");ln(A,930,520,760,505);T(A,934,514,"SERVICE PORT");RC(A,940,570,24,60);P(A,"M940 590h24M940 610h24","d");
+RC(A,40,236,120,18);P(A,"M50 236v18M70 236v18M100 236v18M130 236v18","d");ln(A,160,245,290,300);
+box(A,30,300,110,26,null,3);ln(A,140,313,258,340);box(A,30,410,124,56,"COIL RING",5);ln(A,154,440,250,440);
+RC(A,48,600,28,90);C(A,62,614,8);ln(A,76,640,210,650);ln(A,210,650,285,700);RC(A,40,700,44,10,"l");
+RC(A,150,740,34,66);P(A,"M150 758h34M150 778h34","d");C(A,167,752,7);box(A,26,832,150,56,"CONTAINMENT",4);
+RC(A,26,896,240,76);T(A,34,910,"GATE SPECS","h");
+const SP={};["out","coil","chg","spd"].forEach((k,i)=>SP[k]=T(A,34,926+i*12,""));T(A,150,926,"DIA 80,000 KM");SP.per=T(A,150,938,"");T(A,150,950,"1 DIV=10,000 KM");T(A,150,962,"SHEET 1/1");
+dev(A,330,915,38);ln(A,368,900,430,870);dev(A,655,925,40);P(A,"M615 925h80M655 885v80","d");ln(A,640,888,600,820);
+box(A,790,830,190,140,"COIL LEGEND",13);for(let i=0;i<5;i++)P(A,`M800 ${870+i*20}h8m-3 -3l3 3-3 3`);
+A.querySelectorAll("text").forEach(t=>t.setAttribute("pointer-events","none"));
+
+// ---------- simulation ----------
+const CAP=150,RR=40000,VIS=40,ap=(x,t,k)=>x<t?Math.min(t,x+k):Math.max(t,x-k),on=i=>M[i].s==="online",n=a=>a.filter(on).length;
+const sim={ph:0,b:0,err:0,trim:0,dist:5,jumps:0,pump:100,ov:0,rep:null,ct:25,cal:0,cr:500,con:null,offers:[],clean:true,pe:0,po:0,rc:600,spin:true,rim:0,out:0,temp:3,charge:0,ap:0,stage:"IDLE",t:0,scram:false,load:0,short:false,msg:"",msgT:0,sel:0};
+const rx={st:"OFF",t:0,thr:100,feed:100,field:100,rad:100,resv:80,vent:0,flare:0,breach:0,eff:0,dem:0};
+const t0=Date.now(),pad=v=>String(v).padStart(2,"0");
+const stamp=()=>{const q=(Date.now()-t0)/1000|0;return`T+${pad(q/60|0)}:${pad(q%60)}`};
+function log(m,e){const d=document.createElement("div");d.textContent=`${stamp()}  ${m}`;if(e)d.className="e";$("log").prepend(d);while($("log").children.length>60)$("log").lastChild.remove()}
+const alarm=m=>{if(sim.stage!=="IDLE"&&sim.stage!=="COOLDOWN")sim.clean=false;sim.msg=m;sim.msgT=8;log(m,1);beep(300,.25)};
+let ctx,hum,hg;
+function snd(v){if(v&&!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)();hum=ctx.createOscillator();hg=ctx.createGain();hum.type="sawtooth";hg.gain.value=0;hum.connect(hg).connect(ctx.destination);hum.start()}if(ctx)v?ctx.resume():ctx.suspend()}
+function beep(f,d){if(!ctx||!$("snd").checked)return;const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=f;g.gain.value=.05;o.connect(g).connect(ctx.destination);o.start();o.stop(ctx.currentTime+d)}
+function setStage(s){sim.stage=s;sim.t=0;log("Stage: "+s);beep(520,.08)}
+const coolF=()=>Math.min(1,((on(6)?.3:0)+(on(7)?.3:0))*Math.min(1.2,sim.pump/100)*(sim.ct>100?Math.max(.4,1-(sim.ct-100)/30):1)+rx.rad/100*.4+(on(15)?.1:0));
+const omin=()=>Math.min(.95,.7+sim.dist/80),rmin=()=>200+sim.dist*15,OD=()=>6+sim.dist*.6;
+const chk=a=>a.map(([t,ok])=>({t,ok}));
+const ilk=()=>chk([
+ [`Coils ${n([0,1])}/2, capacitors ${n([2,3,4,5])}/4 (min 3)`,n([0,1])==2&&n([2,3,4,5])>=3],
+ [`Coolant loops ${n([6,7])}/2`,n([6,7])>=1],[`Magnetic containment ${n([9,10])}/2`,n([9,10])==2],["Plasma injector online",on(8)],
+ [`Focus, emitter, tuner ${n([11,12,13])}/3`,n([11,12,13])==3],
+ [`Reactor ${Math.round(sim.out/CAP*100)}% (min ${Math.round(omin()*100)}%)`,sim.out>=CAP*omin()],
+ [`Ring ${Math.round(sim.rim)} km/s (${rmin()}–900)`,sim.rim>=rmin()&&sim.rim<=900],
+ [`Load ${sim.load.toFixed(0)} / ${sim.out.toFixed(0)} YW`,sim.load<=sim.out],
+ [`Core ${sim.temp.toFixed(1)} MK (max 16)`,sim.temp<16],[`Plasma reservoir ${Math.round(rx.resv)}% (min ${25+sim.dist}%)`,rx.resv>=25+sim.dist],[`Phase error ${sim.err.toFixed(1)}° (max 6)`,sim.err<=6],[`Ring settled (±20 km/s)`,Math.abs(sim.rim-sim.rc)<20],[`Phase tuner calibrated`,sim.cal<=0]]);
+const rilk=()=>chk([["Plasma injector online",on(8)],[`Magnetic containment ${n([9,10])}/2`,n([9,10])>=1],
+ [`Plasma reservoir ${Math.round(rx.resv)}% (min 20%)`,rx.resv>=20],[`Confinement field ${Math.round(rx.eff)}% (min 60%)`,rx.eff>=60]]);
+function abort(why){if(sim.stage==="OPEN")failCon(why);alarm("ABORT: "+why);if(sim.stage!=="COOLDOWN")setStage("COOLDOWN")}
+function doScram(why){if(sim.scram)return;if(sim.stage==="OPEN")failCon(why);sim.scram=true;rx.st="SCRAMMED";alarm("SCRAM: "+why);setStage("COOLDOWN")}
+function pick(i){sim.sel=i;detail()}
+function toggle(i){const m=M[i];if(m.s==="online")m.s="offline";else if(m.s==="fault"&&sim.temp>10)return alarm("Cannot reset "+m.c+" above 10 MK");else m.s="online";log(`${m.n} ${m.s==="online"?"online":"powered down"}`);detail()}
+function detail(){const m=M[sim.sel];
+ $("detail").innerHTML=`<div class="row"><b>${m.n}</b><span class="lcd ${m.s==="online"?"":"bad"}">${m.s.toUpperCase()}</span></div><div class="row"><span>Load ${m.p} YW</span><span>${m.role}</span></div><div class="row"><span>Condition</span><span class="lcd" id="hl"></span></div>`;
+ const b=document.createElement("button");b.textContent=m.s==="online"?"Power down":m.s==="fault"?"Reset module":"Power up";b.className="pb amb"+(m.s==="online"?" lit":"");b.onclick=()=>toggle(sim.sel);$("detail").appendChild(b);
+ const r=document.createElement("button");r.textContent="Repair (12 s)";r.className="pb red";r.onclick=()=>repair(sim.sel);$("detail").appendChild(r);
+ const w=document.createElement("button");w.textContent="Manual repair (free)";w.className="pb grn";w.onclick=()=>openMg(sim.sel);$("detail").appendChild(w)}
+const mg={on:false};
+function openMg(i){const m=M[i];if(mg.on)return;if(m.s==="online")return alarm("Power down "+m.c+" before repair");if(sim.temp>9)return alarm("Core too hot for maintenance (below 9 MK)");if(sim.rep&&sim.rep.i===i)return alarm("Repair crew is already working on "+m.c);
+ Object.assign(mg,{on:true,i,n:0,k:0,x:0,d:1,h0:m.h,last:performance.now()});$("mg").classList.add("on");$("mgt").textContent="Manual repair — "+m.n;mgZone();$("mgh").focus();mgLoop()}
+function mgZone(){mg.w=Math.max(.08,.24-.035*mg.n);mg.z=.08+Math.random()*(.84-mg.w);$("mgz").style.left=mg.z*100+"%";$("mgz").style.width=mg.w*100+"%";$("mgk").textContent=`${mg.n}/5 · ✗${mg.k}`}
+function mgLoop(t=performance.now()){if(!mg.on)return;const dt=Math.min(.05,(t-mg.last)/1000);mg.last=t;mg.x+=mg.d*dt*(.9+.25*mg.n);if(mg.x>1){mg.x=1;mg.d=-1}if(mg.x<0){mg.x=0;mg.d=1}
+ $("mgm").style.left=`calc(${mg.x*100}% - 2px)`;if(M[mg.i].s==="online"||sim.temp>12)return endMg("Conditions changed — manual repair suspended");requestAnimationFrame(mgLoop)}
+function mgHit(){if(!mg.on)return;const m=M[mg.i];
+ if(mg.x>=mg.z&&mg.x<=mg.z+mg.w){mg.n++;m.h=Math.min(100,m.h+(100-mg.h0)/5);beep(660,.06);$("mgs").textContent="Good torque";
+  if(mg.n>=5){m.h=100;if(m.s==="fault")m.s="offline";detail();return endMg(m.c+" repaired by hand — no charge")}}
+ else{mg.k++;m.h=Math.max(0,m.h-2);beep(200,.12);$("mgs").textContent="Missed — bolt thread damaged";if(mg.k>=3){detail();return endMg("Bolts stripped on "+m.c+" — repair abandoned")}}
+ mgZone()}
+function endMg(msg){mg.on=false;$("mg").classList.remove("on");if(msg)log(msg)}
+const DST=["Kepler Station","Tau Ceti Relay","Vega Outpost","Sirius Dock","Barnard Yard","Luyten Colony","Wolf Depot","Ross Array","Gliese Port"];
+function newOffers(){const p=[...DST].sort(()=>Math.random()-.5);sim.offers=[0,1,2].map(i=>{const d=[3+Math.random()*5,8+Math.random()*5,14+Math.random()*6][i]|0;return{name:p[i],dist:d,pay:Math.round((100+d*45)/10)*10,t0:120+d*14}});drawOffers()}
+function drawOffers(){const h=$("offers");h.innerHTML="";sim.offers.forEach(o=>{const b=document.createElement("button");b.className="ml";b.disabled=!!sim.con;b.textContent=`${o.name} · ${o.dist} ly · ${o.pay} cr · ${o.t0/60|0}:${pad(o.t0%60)}`;b.onclick=()=>accept(o);h.appendChild(b)})}
+function accept(o){if(sim.stage!=="IDLE")return alarm("Finish the current sequence first");sim.con={...o,left:o.t0};sim.dist=o.dist;$("dist").value=o.dist;log(`Contract accepted: ${o.name}, ${o.dist} ly, ${o.pay} cr`);drawOffers()}
+function deliver(){const c=sim.con;if(!c)return;const avg=sim.pe/Math.max(1,sim.po),n=[];let p=c.pay;if(sim.clean){p*=1.25;n.push("clean run +25%")}if(avg<2){p*=1.15;n.push("precision +15%")}if(c.left>c.t0/2){p*=1.1;n.push("early +10%")}p=Math.round(p);sim.cr+=p;log(`Delivered to ${c.name}: +${p} cr (${n.join(", ")||"base pay"})`);sim.con=null;newOffers()}
+function failCon(why,f=.3){const c=sim.con;if(!c)return;const pen=Math.min(sim.cr,Math.round(c.pay*f));sim.cr-=pen;alarm(`Contract failed (${why}): −${pen} cr`);sim.con=null;newOffers()}
+function repair(i){const m=M[i];if(m.s==="online")return alarm("Power down "+m.c+" before repair");if(sim.temp>9)return alarm("Core too hot for maintenance (below 9 MK)");if(sim.rep)return alarm("Repair crew is busy");const c=Math.round((100-m.h)*2);if(sim.cr<c)return alarm("Not enough credits ("+c+" cr)");sim.cr-=c;sim.rep={i,t:0};log(`Repair crew sent to ${m.c} (−${c} cr)`)}
+M.forEach((m,i)=>{const b=document.createElement("button");b.textContent=m.c;b.title=m.n;b.onclick=()=>pick(i);$("list").appendChild(b)});
+
+function tick(){const dt=.1,run=rx.st==="IGNITING"||rx.st==="RUNNING";
+ rx.eff=rx.field*n([9,10])/2;
+ const tgt=run?rx.thr/100*CAP*Math.min(1,rx.resv/15)*(rx.vent>0?.8:1):0;
+ sim.out=ap(sim.out,tgt,(sim.scram?60:15)*dt);
+ sim.rim=ap(sim.rim,sim.scram||!sim.spin?0:sim.rc,(sim.scram?150:40)*dt);
+ sim.load=M.filter(m=>m.s==="online").reduce((a,m)=>a+m.p,0)+sim.rim/100+rx.field*.04+sim.pump*.04;
+ rx.dem=sim.out/CAP*105;
+ sim.temp+=((5+sim.out/CAP*14*(1.5-coolF()))-sim.temp)*dt/12;
+ if(rx.vent>0){rx.vent-=dt;sim.temp-=1.2*dt;rx.resv-=.5*dt;if(rx.vent<=0)log("Corona vent closed")}
+ if(sim.out>CAP*.2&&Math.random()<.0012){sim.temp+=2.5;rx.flare=3;alarm("Coronal flare — core temperature spike")}
+ rx.flare=Math.max(0,rx.flare-dt);
+ rx.resv=Math.max(0,Math.min(100,rx.resv+((on(8)?rx.feed/100:0)-sim.out/CAP)*.4*dt));
+ if(rx.st==="IGNITING"){rx.t+=dt;if(rx.t>=8){rx.st="RUNNING";log("Ignition complete. Reactor stable.")}}
+ if(sim.out>1&&rx.eff<rx.dem)rx.breach+=dt;else rx.breach=Math.max(0,rx.breach-2*dt);
+ if(rx.breach>6)doScram("plasma confinement lost");
+ {const g=(.5+sim.temp/20)*(1+(100-M[13].h)/60);sim.b=Math.max(-.3,Math.min(.3,sim.b+(Math.random()-.5)*.04));sim.ph=Math.max(-40,Math.min(40,sim.ph+sim.b*g*dt));sim.err=Math.abs(sim.ph+(on(13)&&sim.cal<=0?sim.trim:0));
+ const act=["CHARGE","ALIGN","OPEN"].includes(sim.stage);
+ M.forEach((m,i)=>{if(m.s!=="online")return;m.h=Math.max(0,m.h-dt*(.02+Math.max(0,sim.temp-11)*.02+(act&&LIVE.includes(i)?.12:0)));
+  if(m.h<30&&Math.random()<(30-m.h)/30*.004){m.s="fault";alarm(m.c+" failed — worn out");detail()}});
+ if(Math.random()<.0005){const m=M[Math.random()*16|0];m.h=Math.max(0,m.h-35);alarm("Micrometeoroid strike on "+m.c+" — condition "+m.h.toFixed(0)+"%")}
+ sim.ov=sim.rim>900?sim.ov+dt:Math.max(0,sim.ov-dt);if(sim.ov>6)doScram("ring structural limit exceeded");
+ if(sim.cal>0&&(sim.cal-=dt)<=0){sim.ph=0;sim.b=0;log("Phase tuner recalibrated — drift reset")}
+ sim.ct+=((25+sim.out/CAP*110*(1.25-coolF()))-sim.ct)*dt/15;if(sim.ct>140)doScram("coolant boiling");
+ if(sim.stage==="OPEN"){sim.pe+=sim.err*dt;sim.po+=dt}
+ if(sim.con&&sim.stage!=="OPEN"&&(sim.con.left-=dt)<=0)failCon("deadline missed");
+ if(sim.rep&&(sim.rep.t+=dt)>=12){const m=M[sim.rep.i];m.h=100;if(m.s==="fault")m.s="offline";log(m.c+" repaired — power up when ready");sim.rep=null;detail()}}
+ sim.short=sim.out>0&&sim.load>sim.out+.5;sim.t+=dt;if(sim.msgT>0)sim.msgT-=dt;
+ if(sim.temp>=20)doScram("core temperature trip");
+ if(["CHARGE","ALIGN","OPEN"].includes(sim.stage)){const bad=ilk().find(i=>!i.ok);
+  if(bad)abort("interlock lost — "+bad.t);
+  else if(sim.temp>17.5&&Math.random()<.015){const c=[2,3,4,5,0,1].filter(on)[0];if(c!=null){M[c].s="fault";alarm(M[c].n+" tripped on overtemperature");detail()}}}
+ const s=sim.stage;
+ if(s==="CHARGE"){sim.charge=Math.min(100,sim.charge+7*Math.pow(5/sim.dist,.6)*(sim.out/CAP)*(n([2,3,4,5])/4)*(sim.temp>14.5?.5:1)*dt);if(sim.charge>=100)setStage("ALIGN")}
+ else if(s==="ALIGN"){if(sim.t>=4){setStage("OPEN");log("Aperture opening")}}
+ else if(s==="OPEN"){if(sim.t>=OD()){log("Aperture closed — jump complete");sim.jumps++;deliver();sim.temp+=sim.dist*.12;rx.resv=Math.max(0,rx.resv-sim.dist*.6);[2,3,4,5].forEach(i=>M[i].h=Math.max(0,M[i].h-3));[0,1].forEach(i=>M[i].h=Math.max(0,M[i].h-2));setStage("COOLDOWN")}}
+ else{sim.charge=Math.max(0,sim.charge-8*dt);if(s==="COOLDOWN"&&sim.charge<=0&&sim.t>3)setStage("IDLE")}
+ sim.ap=ap(sim.ap,sim.stage==="OPEN"?1:0,(sim.stage==="OPEN"?.35:.6)*dt);
+ ui();
+}
+const dpt=(a,r)=>[(50+r*Math.sin(a*Math.PI/180)).toFixed(1),(50-r*Math.cos(a*Math.PI/180)).toFixed(1)],dga=(v,m)=>-135+270*Math.max(0,Math.min(1,v/m));
+const mk=(id,defs)=>{const h=$(id);h.className="dials";
+ const arc=(a,b)=>`<path d="M${dpt(a,36)}A36 36 0 ${b-a>180?1:0} 1 ${dpt(b,36)}" class="zr"/>`;
+ h.innerHTML=defs.map(d=>{if(d[9])return HRZ+`<span class="lcd"></span><b>${d[0]}</b>`;let v=`<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" class="bz"/><circle cx="50" cy="50" r="43" class="fc"/>`;
+  if(d[4]!=null)v+=arc(dga(d[4],d[2]),135);if(d[5]!=null)v+=arc(-135,dga(d[5],d[2]));
+  for(let i=0;i<=20;i++){const j=i%5==0,a=-135+13.5*i,p=dpt(a,j?29:33),q=dpt(a,40);v+=`<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" class="tk${j?" mj":""}"/>`}
+  v+=`<text x="50" y="74" class="dt">${d[6]}</text>`;
+  if(d[7])v+=`<g class="mk"><polygon points="50,10 46.5,2 53.5,2"/></g>`;
+  return v+`<g class="nd"><line x1="50" y1="58" x2="50" y2="15"/></g><circle cx="50" cy="50" r="4.5" class="hub"/><path d="M12 42A40 40 0 0 1 88 42Q50 30 12 42Z" class="gl"/></svg><span class="lcd"></span><b>${d[0]}</b>`}).map(x=>`<div class="dl">${x}</div>`).join("");
+ const k=[...h.children];
+ return()=>defs.forEach((d,i)=>{const v=d[1](),e=k[i],L=e.querySelector(".lcd");if(d[9])hrzU(e,d);else e.querySelector(".nd").style.transform=`rotate(${dga(v,d[2])}deg)`;
+  if(d[7])e.querySelector(".mk").style.transform=`rotate(${dga(d[7](),d[2])}deg)`;L.textContent=d[3](v);
+  L.classList.toggle("bad",(d[4]!=null&&v>=d[4])||(d[5]!=null&&v<d[5])||!!(d[8]&&d[8]()))})};
+const HRZ=(()=>{const A=(a,b,r)=>`M${dpt(a,r)}A${r} ${r} 0 0 1 ${dpt(b,r)}`;let v=`<svg class="hz" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" class="bz"/><circle cx="50" cy="50" r="43" class="fc"/><g clip-path="url(#hzc)"><g class="hzR"><g class="hzP"><rect x="-80" y="-200" width="260" height="250" fill="url(#sky)"/><rect x="-80" y="50" width="260" height="250" fill="url(#gnd)"/><line x1="-80" y1="50" x2="180" y2="50" stroke="#fff" stroke-width="1"/>`;
+ for(let i=1;i<=4;i++){const w=i%2?10:18,y=i*9;v+=`<line x1="${50-w}" y1="${50-y}" x2="${50+w}" y2="${50-y}" stroke="#fff" stroke-width=".7"/><line x1="${50-w}" y1="${50+y}" x2="${50+w}" y2="${50+y}" stroke="#ffd9a8" stroke-width=".7"/>`}
+ v+=`</g></g></g><path d="${A(-18,18,43)}" fill="none" stroke="#3f9" stroke-width="2.4"/><path d="${A(18,70,43)}" fill="none" stroke="#e03a3a" stroke-width="2.4"/><path d="${A(-70,-18,43)}" fill="none" stroke="#e03a3a" stroke-width="2.4"/>`;
+ [0,6,12,18,30,45,60].forEach(e=>[-1,1].forEach(sg=>{if(!e&&sg>0)return;const a=sg*e,p=dpt(a,e%18?39.5:37),q=dpt(a,43);v+=`<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="#fff" stroke-width="${e%18?.6:1.2}"/>`}));
+ v+=`<g class="hzR"><polygon class="hzp" points="50,10 46.5,3.5 53.5,3.5" fill="#ffb347" stroke="#000" stroke-width=".4"/></g><polygon points="50,10 47,16 53,16" fill="#fff" stroke="#000" stroke-width=".3"/>
+ <path d="M24 50H40L44 56M76 50H60L56 56" fill="none" stroke="#ffb347" stroke-width="2.4" stroke-linejoin="round" style="filter:drop-shadow(1px 2px 1px #000)"/><circle cx="50" cy="50" r="2" fill="#ffb347"/><text x="50" y="74" class="dt">PHASE ERR</text><path d="M12 42A40 40 0 0 1 88 42Q50 30 12 42Z" class="gl"/></svg>`;return v})();
+const hrzU=(e,d)=>{const v=d[1](),t=performance.now(),sv=e.querySelector(".hz");let r=e._r||0;if(e._t!=null&&t>e._t){const q=(v-e._v)/((t-e._t)/1000);r=r*.85+q*.15}e._r=r;e._v=v;e._t=t;
+ const roll=Math.max(-75,Math.min(75,v*3)),pt=Math.max(-24,Math.min(24,r*6));e.querySelectorAll(".hzR").forEach(g=>g.style.transform=`rotate(${roll}deg)`);e.querySelector(".hzP").style.transform=`translateY(${pt}px)`;sv.classList.toggle("hzbad",!!(d[8]&&d[8]()))};
+const gM=mk("tel",[["REACTOR OUT",()=>sim.out,CAP,v=>v.toFixed(1),null,null,"YW"],["LOAD",()=>sim.load,CAP,v=>v.toFixed(1),null,null,"YW",null,()=>sim.short],
+ ["RIM SPEED",()=>sim.rim,1200,v=>Math.round(v),900,null,"KM/S"],["GATE CHARGE",()=>sim.charge,100,v=>Math.round(v)+"%",null,null,"%"],["PHASE ERR",()=>sim.ph+(on(13)&&sim.cal<=0?sim.trim:0),20,v=>(v>=0?"+":"")+v.toFixed(1)+"°",null,null,"DEG",null,()=>sim.err>6,1]]);
+const rM=mk("rtel",[["OUTPUT",()=>sim.out,CAP,v=>v.toFixed(1),null,null,"YW"],["CORE TEMP",()=>sim.temp,24,v=>v.toFixed(1),16,null,"MK"],
+ ["RESERVOIR",()=>rx.resv,100,v=>v.toFixed(0)+"%",null,15,"%"],["CONFINEMENT",()=>rx.eff,120,v=>v.toFixed(0)+"%",null,null,"% (BLUE = NEED)",()=>rx.dem,()=>rx.eff<rx.dem],
+ ["HEAT REJECT",()=>coolF()*100,100,v=>v.toFixed(0)+"%",null,null,"%"],["COOLANT",()=>sim.ct,160,v=>v.toFixed(0)+"°C",100,null,"°C"]]);
+const fd=(id,l,a,b,s,v)=>`<div class="fd"><div class="trk"><input type="range" id="${id}" min="${a}" max="${b}" step="${s}" value="${v}" aria-label="${l}"></div><b>${l}</b><span class="lcd" id="${id}V"></span></div>`;
+$("fj").innerHTML=fd("dist","DISTANCE",1,20,1,5)+fd("trim","PHASE TRIM",-40,40,1,0);$("fr").innerHTML=fd("rc","RIM SPEED",100,1200,50,600);
+$("fb").innerHTML=[["thr","THROTTLE",0,120,5,100],["feed","PLASMA FEED",0,150,5,100],["field","CONFINE FIELD",0,120,5,100],["rad","RADIATORS",0,100,5,100],["pump","COOL PUMP",0,120,5,100]].map(a=>fd(...a)).join("");
+const list=a=>a.map(i=>`<div class="al ${i.ok?"":"x"}">${i.t}</div>`).join("");
+function ui(){
+ const run=rx.st==="IGNITING"||rx.st==="RUNNING";
+ const warn=sim.scram?"SCRAM — reactor shut down":sim.temp>=16?"CORE TEMPERATURE HIGH":sim.ct>100?"COOLANT OVERHEATING":sim.out>1&&rx.eff<rx.dem?"CONFINEMENT MARGIN LOW":sim.short?"POWER SHORTFALL":sim.rim>900?"RING OVERSPEED":run&&rx.resv<15?"PLASMA RESERVOIR LOW":sim.msgT>0?sim.msg:"";
+ const b=$("banner");b.textContent=warn||(sim.stage==="OPEN"?"APERTURE OPEN":"ALL SYSTEMS NOMINAL");b.className=warn?"bad":"ok";$("sheet").classList.toggle("alarm",!!warn);
+ if(warn&&warn!==ui.w)beep(700,.2);ui.w=warn;
+ $("stg").textContent=sim.scram?"SCRAMMED":sim.stage;$("stp").textContent=sim.stage==="CHARGE"?Math.round(sim.charge)+"%":sim.stage==="ALIGN"?(4-sim.t).toFixed(0)+" s":sim.stage==="OPEN"?(OD()-sim.t).toFixed(0)+" s left":"";
+ $("sbar").firstChild.style.width=(sim.stage==="CHARGE"?sim.charge:sim.stage==="ALIGN"?sim.t/4*100:sim.stage==="OPEN"?100-sim.t/OD()*100:0)+"%";
+ $("go").disabled=sim.scram||sim.stage!=="IDLE";$("ab").disabled=sim.stage==="IDLE"||sim.stage==="COOLDOWN";
+ $("sc").classList.toggle("latched",sim.scram);$("scl").textContent=sim.scram?"RESET":"SCRAM";$("sc").disabled=sim.scram&&sim.temp>8;
+ $("rcV").textContent=sim.rc+" km/s";$("thrV").textContent=rx.thr+"%";$("feedV").textContent=rx.feed+"%";$("fieldV").textContent=rx.field+"%";$("radV").textContent=rx.rad+"%";$("cr").textContent=sim.cr+" cr";{const c=sim.con,q=c?Math.max(0,c.left|0):0;$("mis").textContent=c?`${c.name} · ${c.dist} ly · ${c.pay} cr`:"NO CONTRACT";$("mt").textContent=c?pad(q/60|0)+":"+pad(q%60):"--:--";$("mt").classList.toggle("bad",!!c&&q<30)}
+ $("aban").disabled=!sim.con;$("dist").disabled=!!sim.con||sim.stage!=="IDLE";$("cal").disabled=sim.stage!=="IDLE"||sim.cal>0||!on(13);$("cal").classList.toggle("lit",sim.cal>0);
+ $("pumpV").textContent=sim.pump+"%";$("distV").textContent=sim.dist+" ly";$("trimV").textContent=(sim.trim>0?"+":"")+sim.trim+"°";$("jc").textContent=sim.jumps;$("jinfo").textContent=`Needs reactor ≥${Math.round(omin()*100)}%, ring ≥${rmin()} km/s, reservoir ≥${25+sim.dist}%. Aperture holds ${OD().toFixed(0)} s.`;{const hl=$("hl");if(hl){const m=M[sim.sel];hl.textContent=sim.rep&&sim.rep.i===sim.sel?"REPAIR "+(sim.rep.t/12*100|0)+"%":m.h.toFixed(0)+"%";hl.classList.toggle("bad",m.h<30)}}
+ $("rxs").textContent=rx.st;$("ign").disabled=rx.st!=="OFF"||sim.scram;$("shut").disabled=!run;$("vent").disabled=!run||rx.vent>0;
+ gM();rM();{const L=(i,v)=>$(i).classList.toggle("lit",!!v);L("go",sim.stage!=="IDLE");L("ab",sim.stage!=="IDLE"&&sim.stage!=="COOLDOWN");L("ign",run);L("shut",rx.st==="OFF");L("vent",rx.vent>0)}$("ilk").innerHTML=list(ilk());$("rilk").innerHTML=list(rilk());
+ M.forEach((m,i)=>{gs[i].classList.toggle("off",m.s==="offline");gs[i].classList.toggle("fault",m.s==="fault");gs[i].classList.toggle("sel",i===sim.sel);gs[i].classList.toggle("wn",m.s==="online"&&m.h<30);const q=$("list").children[i];q.className=(i===sim.sel?"sel ":"")+(m.s==="offline"?"off":m.s==="fault"?"fault":m.h<30?"wn":"")});
+ SP.out.textContent=`OUTPUT ..... ${sim.out.toFixed(0)} YW`;SP.coil.textContent=`COILS ...... ${n([0,1,2,3,4,5])}/6`;SP.chg.textContent=`CHARGE ..... ${Math.round(sim.charge)}%`;
+ SP.spd.textContent=`RIM SPEED .. ${Math.round(sim.rim)} KM/S`;SP.per.textContent=sim.rim>5?`PERIOD ${(2*Math.PI*RR/sim.rim/60).toFixed(1)} MIN`:"PERIOD —";
+ $("clock").textContent=stamp();S.style.setProperty("--ch",sim.charge/100);
+ if(hg){hum.frequency.value=35+sim.rim/30+sim.out/10;hg.gain.value=$("snd").checked?.04*sim.out/CAP:0}
+ arc.setAttribute("stroke-dashoffset",100-sim.charge);
+}
+// visuals at frame rate
+let ang=0,sa=0,last=performance.now();
+(function frame(now){const dt=Math.min(.1,(now-last)/1000);last=now;ang+=sim.rim/RR*57.3*VIS*dt;sa+=(20+sim.ap*90)*dt;
+ ring.setAttribute("transform",`rotate(${ang} 500 500)`);core.setAttribute("transform",`rotate(${-ang*1.6} 500 500)`);sw.setAttribute("transform",`rotate(${sa} 500 500)`);
+ const o=sim.out/CAP;STG.setAttribute("opacity",Math.min(1,.1+o*.85+rx.flare*.08));STG.style.filter=`drop-shadow(0 0 ${o*12+rx.flare*4}px #ff9d2e)`;
+ HZ.setAttribute("opacity",sim.ap);const cg=sim.charge/100;rim.setAttribute("opacity",.1+cg*.9);eg.setAttribute("opacity",.15+cg*.85);FL.setAttribute("opacity",sim.ap*.9);AP.style.filter=`drop-shadow(0 0 ${4+sim.ap*16}px var(--hi))`;
+ requestAnimationFrame(frame)})(last);
+
+// controls
+$("go").onclick=()=>{const bad=ilk().find(i=>!i.ok);if(bad)return alarm("Interlock: "+bad.t);sim.clean=true;sim.pe=sim.po=0;log("Jump sequence started");setStage("CHARGE")};
+$("ab").onclick=()=>abort("manual abort");
+$("sc").onclick=()=>{if(sim.scram){sim.scram=false;rx.st="OFF";log("SCRAM reset. Reactor is cold — ignite to restart.")}else doScram("manual")};
+$("spin").onchange=e=>{sim.spin=e.target.checked;log(sim.spin?"Ring drive engaged":"Ring drive stopped")};
+$("ign").classList.add("grn");$("ign").onclick=()=>{const bad=rilk().find(i=>!i.ok);if(bad)return alarm("Cannot ignite: "+bad.t);rx.st="IGNITING";rx.t=0;log("Reactor ignition started")};
+$("shut").onclick=()=>{rx.st="OFF";log("Reactor shutdown ordered")};
+$("vent").onclick=()=>{rx.vent=8;log("Venting stellar corona")};
+[["rc","rc","Ring command %v km/s"],["thr","thr","Throttle %v%"],["feed","feed","Plasma feed %v%"],["field","field","Confinement field %v%"],["rad","rad","Radiators %v%"]].forEach(([id,k,m])=>{
+ const o=k==="rc"?sim:rx;$(id).oninput=e=>o[k]=+e.target.value;$(id).onchange=e=>log(m.replace("%v",e.target.value))});
+document.querySelectorAll(".tabs button").forEach(t=>t.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x===t));$("p-gate").hidden=t.dataset.p!=="gate";$("p-rx").hidden=t.dataset.p!=="rx"});
+const nm={dist:"Jump distance",trim:"Phase trim",pump:"Coolant pump"};
+["dist","trim","pump"].forEach(k=>{$(k).oninput=e=>{if(k==="dist"&&(sim.stage!=="IDLE"||sim.con))e.target.value=sim.dist;else sim[k]=+e.target.value};$(k).onchange=e=>log(nm[k]+" "+e.target.value)});
+$("gh").onclick=()=>{const m=document.body.classList.toggle("min");$("gh").textContent=m?"GATE VIEW":"HIDE GATE"};
+$("mgh").onclick=mgHit;$("mgc").onclick=()=>endMg("Manual repair cancelled");
+document.addEventListener("keydown",e=>{if(!mg.on)return;if(e.key==="Escape")endMg("Manual repair cancelled");else if(e.key===" "&&e.target.tagName!=="BUTTON"){e.preventDefault();mgHit()}});
+$("aban").onclick=()=>failCon("abandoned",.1);$("cal").onclick=()=>{if(sim.cr<40)return alarm("Not enough credits (40 cr)");sim.cr-=40;sim.cal=10;log("Phase tuner recalibration started (10 s, −40 cr)")};
+$("snd").onchange=e=>snd(e.target.checked);
+
+// ---------- v2: toasts, collapsible panels, multiplayer ----------
+const toast=(m,bad)=>{const d=document.createElement("div");d.className="toast"+(bad?" bad":"");d.textContent=m;$("toasts").appendChild(d);while($("toasts").children.length>3)$("toasts").firstChild.remove();setTimeout(()=>d.remove(),4200)};
+document.addEventListener("click",e=>{const h=e.target.closest("section h2");if(h)h.parentElement.classList.toggle("col")});
+setInterval(()=>{const b=$("banner");$("abar").textContent=b.textContent;$("abar").className=b.className==="bad"?"bad":"";$("bsc").textContent=$("scl").textContent},250);
+$("bsc").onclick=()=>$("sc").click();
+const MP={mode:"solo",room:null,role:"cmd",name:"CREW-"+(100+Math.random()*900|0),code:"",last:0};
+const GATE_M=[0,1,2,3,4,5,11,12,13,14],mo=i=>GATE_M.includes(i)?"gate":"rx";
+const CLK={go:"gate",ab:"gate",cal:"gate",aban:"gate",ign:"rx",shut:"rx",vent:"rx",sc:"all"};
+const SETC={dist:"gate",trim:"gate",rc:"gate",spin:"gate",thr:"rx",feed:"rx",field:"rx",rad:"rx",pump:"rx"};
+const perm=(r,o)=>r!=="obs"&&(r==="cmd"||o==="all"||r===o);
+const RS={cmd:"CMD",gate:"GATE",rx:"REACTOR",obs:"OBS"};
+const _log=log;log=(m,e)=>{_log(m,e);if(e)toast(m,1);if(MP.mode==="host")MP.room.emit("log",{m,e:e?1:0})};
+const _t=toggle,_r=repair,_a=accept,_e=endMg;
+const cl=()=>MP.mode==="client",deny=o=>toast("That's the "+(o==="gate"?"Gate Officer's":"Reactor Engineer's")+" station",1);
+toggle=i=>{if(MP.mode!=="solo"&&!perm(MP.role,mo(i)))return deny(mo(i));cl()?send({k:"tog",i}):_t(i)};
+repair=i=>{if(MP.mode!=="solo"&&MP.role==="obs")return;cl()?send({k:"rep",i}):_r(i)};
+accept=o=>{if(MP.mode!=="solo"&&!perm(MP.role,"gate"))return deny("gate");cl()?send({k:"acc",n:sim.offers.indexOf(o)}):_a(o)};
+endMg=m=>{const i=mg.i,w=mg.on&&/repaired by hand/.test(m||"");_e(m);if(w&&cl())send({k:"mfix",i})};
+const _tick=tick;tick=()=>{if(!cl())_tick()};
+const send=c=>MP.room&&MP.room.emit("cmd",c);
+// capture-phase interceptors: in client mode controls become commands to the host
+document.addEventListener("click",e=>{if(!cl())return;const b=e.target.closest("button");if(b&&CLK[b.id]){e.stopImmediatePropagation();e.preventDefault();send({k:"click",id:b.id})}},true);
+const lastS={};["input","change"].forEach(ev=>document.addEventListener(ev,e=>{if(!cl())return;const id=e.target.id;if(!(id in SETC))return;e.stopImmediatePropagation();
+ const now=Date.now();if(ev==="change"||id==="spin"||now-(lastS[id]||0)>120){lastS[id]=now;send({k:"set",id,v:e.target.type==="checkbox"?e.target.checked:+e.target.value})}},true));
+function exec(c,r){
+ if(c.k==="click"&&CLK[c.id]){if(!perm(r,CLK[c.id]))return;$(c.id).click()}
+ else if(c.k==="set"&&SETC[c.id]){if(!perm(r,SETC[c.id]))return;const e=$(c.id);if(c.id==="spin"){e.checked=!!c.v;e.dispatchEvent(new Event("change"))}else{e.value=+c.v;e.dispatchEvent(new Event("input"));e.dispatchEvent(new Event("change"))}}
+ else if(c.k==="tog"){const i=c.i|0;if(M[i]&&perm(r,mo(i)))_t(i)}
+ else if(c.k==="rep"){const i=c.i|0;if(M[i]&&perm(r,"all"))_r(i)}
+ else if(c.k==="mfix"){const m=M[c.i|0];if(m&&perm(r,"all")&&m.s!=="online"){m.h=100;if(m.s==="fault")m.s="offline";log(m.c+" repaired by hand");detail()}}
+ else if(c.k==="acc"){const o=sim.offers[c.n|0];if(o&&perm(r,"gate"))_a(o)}}
+const SK=["ph","err","trim","dist","jumps","pump","ct","cal","cr","clean","rc","spin","rim","out","temp","charge","ap","stage","t","scram","load","short","msg","msgT"];
+const q2=v=>typeof v==="number"?+v.toFixed(2):v;
+const snapObj=()=>{const s={};SK.forEach(k=>s[k]=q2(sim[k]));const x={};for(const k in rx)x[k]=q2(rx[k]);
+ return{s,x,m:M.map(m=>[m.s==="online"?0:m.s==="fault"?2:1,Math.round(m.h)]),c:sim.con&&{...sim.con,left:q2(sim.con.left)},o:sim.offers,rp:sim.rep&&{i:sim.rep.i,t:q2(sim.rep.t)}}};
+let offK="";
+function applySnap(d){Object.assign(sim,d.s);Object.assign(rx,d.x);let ch=false;
+ d.m.forEach(([s,h],i)=>{const v=["online","offline","fault"][s];if(i===sim.sel&&M[i].s!==v)ch=true;M[i].s=v;M[i].h=h});
+ sim.con=d.c||null;sim.rep=d.rp||null;const k=JSON.stringify(d.o)+!!d.c;if(k!==offK){offK=k;sim.offers=d.o;drawOffers()}
+ if(ch)detail();syncCtl();ui()}
+function syncCtl(){const v={dist:sim.dist,trim:sim.trim,rc:sim.rc,pump:sim.pump,thr:rx.thr,feed:rx.feed,field:rx.field,rad:rx.rad};
+ for(const id in v){const e=$(id);if(e!==document.activeElement&&+e.value!==v[id])e.value=v[id]}$("spin").checked=!!sim.spin}
+const peers=()=>{const p=MP.room?[...MP.room.peers()]:[];if(!p.some(x=>x.isMe))p.unshift({isMe:1,peer:"me",presence:{n:MP.name,r:MP.role,h:MP.mode==="host"?1:0}});return p};
+const isHost=pe=>peers().some(x=>x.peer===pe&&x.presence&&x.presence.h===1);
+function pres(){MP.room&&MP.room.presence({n:MP.name,r:MP.role,h:MP.mode==="host"?1:0})}
+function crew(){const c=$("crew");c.innerHTML="";if(MP.mode==="solo")return;peers().forEach(p=>{const d=document.createElement("span"),r=p.presence||{};d.className="pill";d.dataset.r=r.r||"obs";d.textContent=(r.h?"★ ":"")+(r.n||"?")+" · "+(RS[r.r]||"OBS")+(p.isMe?" (you)":"");c.appendChild(d)})}
+function chip(){const c=$("chip");c.className="chip";if(MP.mode==="solo")c.textContent="SOLO";else if(MP.mode==="host"){c.textContent="HOST · "+MP.code;c.classList.add("live")}else{const ok=Date.now()-MP.last<3000;c.textContent=ok?"CREW · "+MP.code:"WAITING FOR HOST";c.classList.add(ok?"live":"bad")}}
+function roleCls(){document.body.className=document.body.className.replace(/\b(r-\w+|mp)\b/g,"").trim();if(MP.mode!=="solo"){document.body.classList.add("mp","r-"+MP.role)}}
+const mst=(m,b)=>{$("mst").textContent=m;$("mst").classList.toggle("bad",!!b)};
+async function connect(mode,local){
+ const code=$("mcode").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");MP.name=($("mname").value.trim()||MP.name).slice(0,14);MP.role=$("mrole").value;
+ if(code.length<3)return mst("Enter a crew code (3–6 letters or digits).",1);
+ if(MP.room)await leave();mst("Connecting…");
+ let rm=null;if(!local&&window.claude&&claude.use){try{rm=await claude.use("room")}catch(e){}}
+ MP.code=code;MP.room=rm?await rm.join("ultrarune-"+code):localRoom(code);MP.local=!rm;const R=MP.room;MP.mode="client";pres();
+ R.on("snap",m=>{if(cl()&&isHost(m.peer)){MP.last=Date.now();applySnap(m.data)}});
+ R.on("log",m=>{if(cl()&&isHost(m.peer)&&m.data)log(String(m.data.m).slice(0,200),m.data.e)});
+ R.on("cmd",m=>{if(MP.mode!=="host"||m.isMe)return;const p=R.peers().find(x=>x.peer===m.peer);exec(m.data||{},(p&&p.presence.r)||"obs")});
+ R.on("chat",m=>{const p=R.peers().find(x=>x.peer===m.peer);_log(`<${(p&&p.presence.n)||"?"}> ${String(m.data).slice(0,140)}`)});
+ R.onPeers(()=>{crew();chip()});
+ await new Promise(r=>setTimeout(r,700));
+ const other=R.peers().some(x=>!x.isMe&&x.presence&&x.presence.h===1);
+ if(mode==="host"&&!other){MP.mode="host";pres();toast("Hosting crew "+code+" — share the code");mst(MP.local?"Hosting "+code+". Tabs in this browser can Join with the same code. For other devices press Create invite.":"Hosting "+code+". Others open this page and Join with the same code.")}
+ else if(mode==="host"){toast("Crew "+code+" already has a host — joined as crew",1);mst("Joined "+code+" as crew (host already present).")}
+ else mst("Joined "+code+". Waiting for the host's first update…");
+ roleCls();crew();chip();if(MP.mode!=="host")log("Linked to crew "+code)}
+async function leave(){const R=MP.room;MP.room=null;MP.mode="solo";roleCls();crew();chip();if(R)try{await R.leave()}catch(e){}}
+$("mpb").onclick=()=>{$("mname").value=MP.name;$("mrole").value=MP.role;$("mcode").value=MP.code||Math.random().toString(36).slice(2,6).toUpperCase();$("lob").classList.add("on")};
+$("mclose").onclick=()=>$("lob").classList.remove("on");$("mhost").onclick=()=>connect("host");$("mjoin").onclick=()=>connect("join");
+$("mleave").onclick=async()=>{await leave();mst("Left the crew. Playing solo.")};
+$("mrole").onchange=()=>{MP.role=$("mrole").value;if(MP.room){pres();roleCls();crew()}};
+$("cin").onkeydown=e=>{if(e.key==="Enter"&&e.target.value.trim()&&MP.room){MP.room.emit("chat",e.target.value.trim());e.target.value=""}};
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("lob").classList.remove("on")});
+setInterval(()=>{if(MP.mode==="host"){if(MP.room.peers().some(x=>!x.isMe))MP.room.emit("snap",snapObj());syncCtl()}chip()},250);
+// standalone room: BroadcastChannel (same browser) + WebRTC data channels (other devices, manual code exchange)
+function localRoom(code){
+ const id=Math.random().toString(36).slice(2,10),P=new Map(),H={},PL=[],links=[],seen=new Set();let seq=0,mypr={},bc=null,iv=0;
+ const list=()=>[{peer:id,isMe:true,sameTab:true,presence:mypr},...[...P].map(([k,v])=>({peer:k,isMe:false,sameTab:false,presence:v.p}))];
+ const fire=()=>PL.slice().forEach(f=>{try{f({peers:list()})}catch(e){}});
+ const disp=(topic,data,from)=>(H[topic]||[]).slice().forEach(f=>{try{f({topic,data,peer:from,isMe:from===id,sameTab:from===id})}catch(e){}});
+ const out=(e,except)=>links.forEach(l=>{if(l!==except)try{l.send(e)}catch(x){}});
+ const mk=(t,x={})=>({f:id,n:++seq,t,...x});
+ const ann=t=>out(mk(t||"pr",{p:mypr}));
+ function recv(e,from){if(!e||!e.f||e.f===id)return;const k=e.f+":"+e.n;if(seen.has(k))return;seen.add(k);if(seen.size>3000)seen.clear();
+  if(e.t==="ev")disp(e.topic,e.data,e.f);
+  else if(e.t==="bye"){if(P.delete(e.f))fire()}
+  else if(e.t==="pr"||e.t==="hi"){const had=P.has(e.f);P.set(e.f,{p:e.p||{},t:Date.now(),l:from});if(e.t==="hi")ann();fire()}
+  if(P.has(e.f))P.get(e.f).t=Date.now();
+  out(e,from)}
+ function addLink(dc){const l={send:e=>{if(dc.readyState==="open")dc.send(JSON.stringify(e))}};links.push(l);
+  dc.onopen=()=>ann("hi");dc.onmessage=m=>{try{recv(JSON.parse(m.data),l)}catch(x){}};
+  dc.onclose=()=>{const i=links.indexOf(l);if(i>=0)links.splice(i,1);[...P].forEach(([k,v])=>{if(v.l===l)P.delete(k)});fire()};if(dc.readyState==="open")ann("hi")}
+ if(typeof BroadcastChannel!=="undefined"){try{bc=new BroadcastChannel("ultrarune-"+code);const l={send:e=>bc.postMessage(e)};links.push(l);bc.onmessage=m=>recv(m.data,l)}catch(e){bc=null}}
+ iv=setInterval(()=>{ann();const n=Date.now();let c=false;[...P].forEach(([k,v])=>{if(n-v.t>7000){P.delete(k);c=true}});if(c)fire()},2000);
+ setTimeout(()=>ann("hi"),50);
+ return{id,addLink,peers:list,
+  emit:(topic,data)=>{const e=mk("ev",{topic,data});seen.add(id+":"+e.n);disp(topic,data,id);out(e);return Promise.resolve()},
+  on:(t,h)=>{(H[t]=H[t]||[]).push(h);return()=>{H[t]=(H[t]||[]).filter(x=>x!==h)}},
+  presence:p=>{mypr={...mypr,...p};ann();fire();return Promise.resolve()},
+  onPeers:f=>{PL.push(f);return()=>{const i=PL.indexOf(f);if(i>=0)PL.splice(i,1)}},
+  leave:async()=>{ann("bye");clearInterval(iv);if(bc)bc.close();links.length=0;P.clear()}}}
+
+const ICE={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};let pend=null;
+const gather=pc=>new Promise(r=>{if(pc.iceGatheringState==="complete")return r();pc.onicegatheringstatechange=()=>pc.iceGatheringState==="complete"&&r();setTimeout(r,4000)});
+const showCode=o=>{$("mlink").value=btoa(JSON.stringify(o));$("mlink").select()};
+$("minv").onclick=async()=>{if(MP.mode!=="host"||!MP.local)return mst("Press Host first (standalone mode) — then create an invite.",1);
+ if(!window.RTCPeerConnection)return mst("This browser has no WebRTC.",1);
+ const pc=new RTCPeerConnection(ICE);pend=pc;MP.room.addLink(pc.createDataChannel("u"));
+ await pc.setLocalDescription(await pc.createOffer());mst("Gathering network info…");await gather(pc);
+ showCode({y:"offer",c:MP.code,s:pc.localDescription.sdp});mst("Invite code ready. Send it to ONE player, paste their reply here and press Accept reply.")};
+$("macc").onclick=async()=>{try{const o=JSON.parse(atob($("mlink").value.trim()));if(o.y!=="answer"||!pend)throw 0;await pend.setRemoteDescription({type:"answer",sdp:o.s});pend=null;mst("Linking… the player should appear in the crew list.");$("mlink").value=""}catch(e){mst("That isn't a valid reply code (or no invite is pending).",1)}};
+$("mans").onclick=async()=>{let o;try{o=JSON.parse(atob($("mlink").value.trim()));if(o.y!=="offer")throw 0}catch(e){return mst("Paste the host's invite code first.",1)}
+ $("mcode").value=o.c;await connect("join",true);const pc=new RTCPeerConnection(ICE);pc.ondatachannel=e=>MP.room&&MP.room.addLink(e.channel);
+ await pc.setRemoteDescription({type:"offer",sdp:o.s});await pc.setLocalDescription(await pc.createAnswer());mst("Gathering network info…");await gather(pc);
+ showCode({y:"answer",s:pc.localDescription.sdp});mst("Reply code ready — send it back to the host. Keep this page open.")};
+$("mcopy").onclick=async()=>{const t=$("mlink");t.select();try{await navigator.clipboard.writeText(t.value);toast("Code copied")}catch(e){document.execCommand("copy")}};
+
+(()=>{const c=$("stars"),x=c.getContext("2d");let W,H,st=[];const rs=()=>{W=c.width=innerWidth;H=c.height=innerHeight;st=Array.from({length:Math.min(220,W*H/7000|0)},()=>({x:Math.random()*W,y:Math.random()*H,z:Math.random()*.9+.1,p:Math.random()*6.28}))};
+ addEventListener("resize",rs);rs();let t0=0;const f=t=>{requestAnimationFrame(f);if(document.hidden||t-t0<33)return;t0=t;x.clearRect(0,0,W,H);
+  for(const s of st){s.x-=.05*s.z;if(s.x<0)s.x=W;const a=.35+.45*Math.sin(t/900*s.z+s.p);x.fillStyle=`rgba(${s.z>.8?"255,230,200":"190,225,255"},${a*s.z})`;x.fillRect(s.x,s.y,s.z*1.8,s.z*1.8)}};requestAnimationFrame(f)})();
+
+// ---------- v5: upgrades, random events, service record ----------
+const UP=[["Nano-repair gel","Rapidly heals every powered-down module",1500],["Heat sinks","Core runs cooler under load",1750],["Phase damper","Calms phase drift automatically",2250],["Plasma cache","Reservoir refills faster",2000]];
+sim.upm=0;sim.evn="";sim.evt=0;SK.push("upm","evn","evt");let evNext=70+Math.random()*50,evBad=1;
+UP.forEach((u,i)=>{const b=document.createElement("button");b.className="pb";b.id="up"+i;b.innerHTML=`<b>${u[0]}</b><small>${u[1]}</small><span class="cs"></span>`;$("ups").appendChild(b);CLK["up"+i]="gate";
+ b.onclick=()=>{if(sim.upm>>i&1)return;if(sim.cr<u[2])return alarm(`Not enough credits (${u[2]} cr)`);sim.cr-=u[2];sim.upm|=1<<i;log("Installed upgrade: "+u[0]);toast("Installed: "+u[0])}});
+const EV=[
+ ["SOLAR STORM",20,1,()=>alarm("Solar storm — core heating for 20 s")],
+ ["ION STORM",15,1,()=>alarm("Ion storm — phase drift unstable for 15 s")],
+ ["DEBRIS FIELD",5,1,()=>{[0,0].forEach(()=>{const m=M[Math.random()*16|0];m.h=Math.max(0,m.h-25)});alarm("Debris field — two modules damaged");detail()}],
+ ["PLASMA LEAK",5,1,()=>{rx.resv=Math.max(0,rx.resv-14);alarm("Plasma leak — reservoir −14%")}],
+ ["SUPPLY DROP",6,0,()=>{sim.cr+=150;log("Supply drop recovered: +150 cr");toast("Supply drop: +150 cr")}]];
+let evCur=-1;
+function ext(){const dt=.1,u=sim.upm|0,run=rx.st==="RUNNING";
+ if(u&1)M.forEach(m=>{if(m.s==="offline")m.h=Math.min(100,m.h+dt*1.2)});
+ if(u&2&&sim.temp>5)sim.temp-=dt*.035;
+ if(u&4)sim.ph*=1-dt*.025;
+ if(u&8&&run)rx.resv=Math.min(100,rx.resv+dt*.12);
+ if(sim.evt>0){sim.evt=Math.max(0,sim.evt-dt);if(evCur===0)sim.temp+=dt*.06;if(evCur===1)sim.ph=Math.max(-40,Math.min(40,sim.ph+(Math.random()-.5)*dt*8));
+  if(sim.evt<=0){sim.evn="";if(evCur<2)log("Event cleared: "+EV[evCur][0].toLowerCase())}}
+ else if(run&&!sim.scram){evNext-=dt;if(evNext<=0){evNext=75+Math.random()*60;evCur=Math.random()*EV.length|0;const e=EV[evCur];sim.evn=e[0];sim.evt=e[1];evBad=e[2];e[3]()}}}
+const _t4=tick;tick=()=>{_t4();if(!cl())ext()};
+setInterval(()=>{const c=$("evc");c.hidden=!sim.evn;if(sim.evn){c.textContent=sim.evn+" · "+Math.ceil(sim.evt)+"s";const g=/SUPPLY/.test(sim.evn);c.className="chip "+(g?"good":"bad")}},300);
+const ACH=[["First jump","Complete one jump",()=>sim.jumps>=1],["Frequent flyer","Complete 10 jumps",()=>sim.jumps>=10],["Veteran","Complete 25 jumps",()=>sim.jumps>=25],["Tycoon","Hold 2000 credits",()=>sim.cr>=2000],["Fully fitted","Own every upgrade",()=>(sim.upm|0)===15],["Weathered","Survive an event while the reactor runs",()=>sim.evn===""&&evSeen]];
+let evSeen=false,got=[];try{got=JSON.parse(localStorage.getItem("ultrarune.ach")||"[]")}catch(e){}
+$("ach").innerHTML=ACH.map((a,i)=>`<span class="ac" id="ac${i}" title="${a[1]}">${a[0]}</span>`).join("");
+setInterval(()=>{if(sim.evn)evSeen=true;
+ ACH.forEach((a,i)=>{let ok=false;try{ok=a[2]()}catch(e){}if(ok&&!got.includes(i)){got.push(i);try{localStorage.setItem("ultrarune.ach",JSON.stringify(got))}catch(e){}toast("Achievement: "+a[0])}$("ac"+i).classList.toggle("on",got.includes(i))});
+ UP.forEach((u,i)=>{const b=$("up"+i),own=sim.upm>>i&1;b.classList.toggle("own",!!own);b.querySelector(".cs").textContent=own?"INSTALLED":u[2]+" cr";b.disabled=!!own||sim.cr<u[2]&&!own&&false})},500);
+// ---------- v6: harder controls ----------
+Object.assign(sim,{arm:0,cap:[50,50,50,50],fx:0,fy:0,tx:0,ty:0,lock:0,bad:0,prime:0,primed:false});
+SK.push("arm","cap","fx","fy","tx","ty","lock","bad","prime","primed");
+rx.thr=40;$("thr").value=40;
+const cz=(v,a,b)=>Math.max(a,Math.min(b,v));
+const sec=(t,h,b4)=>{const s=document.createElement("section");s.innerHTML=`<h2>${t}</h2>${h}`;b4.parentNode.insertBefore(s,b4)};
+sec("Launch arming",`<div id="arw"></div><div id="pad"></div><div class="row"><span style="font-size:10px;letter-spacing:.12em;color:#b8c4d0">CODE STATUS</span><span class="lcd" id="armS"></span></div><small>Enter the displayed code with the arrow keys, WASD or the pad before Start. A wrong key resets progress and locks input for 1 s. A new code is issued after every jump.</small>`,$("shop"));
+sec("Capacitor routing",`<div class="fb">${[0,1,2,3].map(i=>fd("cp"+i,"CAP-"+"ABCD"[i],0,100,5,50)).join("")}</div><small>Charge-rate per bank. Average sets charge speed (50% = nominal). Keep banks within 30 points of each other and below 90%, or the hottest bank wears out fast.</small>`,$("shop"));
+sec("Aperture alignment",`<div class="fb">${fd("fx","FOCUS X",-50,50,1,0)}${fd("fy","FOCUS Y",-50,50,1,0)}</div><div class="row"><span style="font-size:10px;letter-spacing:.12em;color:#b8c4d0">FOCUS ERROR</span><span class="lcd" id="aer"></span></div><div class="bar" id="alk"><i></i></div><small>The target wanders from charge onward. Hunt it down using the error readout: ≤4 u for 4 s holds ALIGN, then stay ≤7 u while the aperture is open. A worn focus array drifts faster.</small>`,$("shop"));
+sec("Injector priming",`<div class="row"><span class="lcd" id="prS" style="text-align:left"></span></div><div class="btns"><button class="pb grn" id="prime">Prime injector</button></div><small>Reactor must be OFF. Hold plasma feed 40–80% and confine field ≥70% for 6 s. Ignite only while primed, with throttle ≤40% during ignition, then ramp up.</small>`,$("rilk").parentElement);
+CLK.prime="rx";["fx","fy","cp0","cp1","cp2","cp3"].forEach(k=>SETC[k]="gate");
+$("fx").oninput=e=>sim.fx=+e.target.value;$("fy").oninput=e=>sim.fy=+e.target.value;[0,1,2,3].forEach(i=>$("cp"+i).oninput=e=>sim.cap[i]=+e.target.value);
+$("prime").onclick=()=>{if(rx.st!=="OFF")return alarm("Reactor must be cold to prime");if(rx.feed<40||rx.feed>80||rx.field<70)return alarm("Priming needs feed 40–80% and field ≥70%");sim.prime=6;log("Injector priming started")};
+document.addEventListener("click",e=>{if(cl())return;const b=e.target.closest("button");if(!b)return;
+ if(b.id==="go"&&sim.arm<3){e.stopImmediatePropagation();e.preventDefault();alarm("Enter the arming code first")}
+ if(b.id==="ign"&&!sim.primed){e.stopImmediatePropagation();e.preventDefault();alarm("Injector not primed — run Prime first")}},true);
+let prevS="",capT=0;
+function v6(){const dt=.1,s=sim.stage,act=s==="CHARGE"||s==="ALIGN"||s==="OPEN";
+ if(s==="CHARGE"&&prevS!=="CHARGE"){sim.tx=Math.round((Math.random()-.5)*70);sim.ty=Math.round((Math.random()-.5)*70);sim.lock=0;sim.bad=0}
+ prevS=s;if(sim.lk>0)sim.lk=Math.max(0,sim.lk-dt);if(s==="COOLDOWN"||sim.scram){if(sim.arm>=3)newCode();sim.arm=0}
+ if(sim.prime>0){if(rx.feed<40||rx.feed>80||rx.field<70){sim.prime=0;alarm("Priming aborted — feed 40–80%, field ≥70% required")}else if((sim.prime-=dt)<=0){sim.prime=0;sim.primed=true;log("Injector primed — ignition permitted")}}
+ if(rx.st!=="OFF"){sim.primed=false;sim.prime=0}
+ if(rx.st==="IGNITING"&&rx.thr>40)rx.breach+=dt*1.5;
+ if(!act)return;
+ const k=(2+(100-M[11].h)/25+(sim.temp>14?3:0))*(sim.evn==="ION STORM"?3:1);
+ sim.tx=cz(sim.tx+(Math.random()-.5)*dt*k,-45,45);sim.ty=cz(sim.ty+(Math.random()-.5)*dt*k,-45,45);
+ const e=Math.hypot(sim.fx-sim.tx,sim.fy-sim.ty);
+ if(s==="ALIGN"){sim.lock=e<=4?sim.lock+dt:Math.max(0,sim.lock-2*dt);sim.t=Math.min(sim.t,sim.lock)}
+ if(s==="OPEN"){sim.bad=e>7?sim.bad+dt:Math.max(0,sim.bad-dt);if(sim.bad>5)abort("aperture misaligned")}
+ if(s==="CHARGE"){const o=[2,3,4,5].filter(on);if(o.length){const v=o.map(i=>sim.cap[i-2]),av=v.reduce((a,b)=>a+b)/v.length,mx=Math.max(...v),sp=mx-Math.min(...v),f=cz(av/50,.15,1.6);
+  sim.charge=cz(sim.charge+7*Math.pow(5/sim.dist,.6)*(sim.out/CAP)*(o.length/4)*(f-1)*dt,0,100);
+  o.forEach(i=>{const x=sim.cap[i-2];if(x>88)M[i].h=Math.max(0,M[i].h-dt*.15);if(sp>30&&x===mx){M[i].h=Math.max(0,M[i].h-dt*(sp-30)*.012);sim.temp+=dt*.02}});
+  if(sp>30&&(capT-=dt)<=0){capT=8;alarm("Capacitor imbalance — banks "+sp+" points apart")}}}}
+const _t6=tick;tick=()=>{_t6();if(!cl())v6()};
+setInterval(()=>{const g=sim.arm|0,act=["CHARGE","ALIGN","OPEN"].includes(sim.stage),e=Math.hypot(sim.fx-sim.tx,sim.fy-sim.ty);
+ drawCode();
+ $("armS").textContent=g>=3?"ARMED":sim.sp+"/"+sim.seq.length;$("armS").classList.toggle("bad",g<3);
+ $("aer").textContent=act?e.toFixed(1)+" u":"STANDBY";$("aer").classList.toggle("bad",act&&e>(sim.stage==="ALIGN"?4:7));
+ $("alk").firstChild.style.width=(sim.stage==="ALIGN"?cz(sim.lock/4,0,1)*100:sim.stage==="OPEN"?cz(1-sim.bad/5,0,1)*100:0)+"%";
+ $("fxV").textContent=sim.fx;$("fyV").textContent=sim.fy;[0,1,2,3].forEach(i=>$("cp"+i+"V").textContent=sim.cap[i]+"%");
+ $("prS").textContent=sim.primed?"PRIMED":sim.prime>0?"PRIMING "+Math.ceil(sim.prime)+" s":"NOT PRIMED";$("prS").classList.toggle("bad",!sim.primed);
+ $("prime").disabled=rx.st!=="OFF"||sim.primed||sim.scram||sim.prime>0;
+ if(cl()){[["fx",sim.fx],["fy",sim.fy],...[0,1,2,3].map(i=>["cp"+i,sim.cap[i]])].forEach(([id,v])=>{const x=$(id);if(x!==document.activeElement&&+x.value!==v)x.value=v})}},200);
+// ---------- v7: single control-room layout ----------
+(()=>{
+const css=document.createElement("style");css.textContent=`
+body,body.min{grid-template-columns:minmax(380px,42%) minmax(0,1fr)!important;height:100vh!important;overflow:hidden!important}
+#L,#R{display:none!important}
+#LC{position:relative;z-index:1;height:calc(100vh - 40px);overflow:auto;padding:8px;display:grid;gap:8px;align-content:start;scrollbar-width:thin}
+#LC .mid{position:static!important;display:grid!important;padding:0!important;gap:6px}
+#LC .sheet{display:block!important;width:min(100%,calc(100vh - 400px))!important;min-width:260px!important;margin:0 auto}
+#gh{display:none}
+#wall{display:grid;grid-template-columns:1fr 1fr;gap:8px}#wall .mstr{grid-column:1/-1}#wall section{padding:10px}#wall .ann{grid-template-columns:1fr}
+#BIG{position:relative;z-index:1;height:calc(100vh - 40px);display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:8px;padding:10px 12px 12px 4px}
+#t7{flex-wrap:wrap}
+#scrT{font:700 11px var(--fd);letter-spacing:.22em;color:#7dff9a;text-shadow:0 0 8px #3f9;padding:6px 10px;background:#03100a;border:1px solid #000;box-shadow:inset 0 0 12px #000,0 0 0 1px #2f8a52}
+#scrB{overflow:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;align-content:start;padding:16px;zoom:1.12;border:14px solid #12161b;border-radius:22px;background:radial-gradient(#0e2a1a,#030d08);box-shadow:inset 0 0 70px #000,0 0 0 2px #000,0 0 0 4px #29313b,0 0 40px #1f9d5a44;scrollbar-width:thin}
+@media(max-width:1000px){body,body.min{grid-template-columns:1fr!important;height:auto!important;overflow:auto!important}#LC,#BIG{height:auto}#scrB{zoom:1}}`;
+document.head.appendChild(css);
+const SE=window.SE7={};document.querySelectorAll("aside section").forEach(s=>{const h=s.querySelector("h2");SE[h?h.textContent.trim():"mstr"]=s});
+const lc=document.createElement("div");lc.id="LC";const wall=document.createElement("div");wall.id="wall";
+["mstr","Gate interlocks","Ignition checks"].forEach(k=>wall.appendChild(SE[k]));
+document.body.insertBefore(lc,$("L"));lc.append(document.querySelector(".mid"),wall);
+document.querySelector(".plate").textContent="MIMIC PANEL — CLICK A MODULE TO OPEN ITS CONTROLS";
+const big=document.createElement("div");big.id="BIG";big.innerHTML='<div class="tabs" id="t7"></div><div id="scrT"></div><div id="scrB"></div>';document.body.insertBefore(big,$("L"));
+const PG=window.PG7={JUMP:["Jump planner","Jump sequence","Launch arming"],ALIGN:["Aperture alignment","Gate telemetry"],RING:["Ring drive","Capacitor routing"],REACTOR:["Stellar reactor","Reactor controls","Injector priming","Reactor telemetry"],OPS:["Mission computer","Ship upgrades","Service record"],MODULES:[]};
+const MPG=["RING","RING","RING","RING","RING","RING","REACTOR","REACTOR","REACTOR","REACTOR","REACTOR","ALIGN","ALIGN","JUMP","REACTOR","REACTOR"];
+const used=new Set(["mstr","Gate interlocks","Ignition checks"]);
+for(const k in SE)if(!used.has(k))$("scrB").appendChild(SE[k]);
+function show(p,mod){[...$("t7").children].forEach(b=>b.classList.toggle("on",b.dataset.p===p));
+ const l=(mod||p==="MODULES"?["Coils & systems"]:[]).concat(PG[p]);
+ for(const k in SE){if(used.has(k))continue;const i=l.indexOf(k);SE[k].style.display=i<0?"none":"";SE[k].style.order=i;if(i>=0)SE[k].classList.remove("col")}
+ $("scrT").textContent="SCREEN · "+p+(mod||p==="MODULES"?" · "+M[sim.sel].c+" "+M[sim.sel].n.toUpperCase():"")}
+Object.keys(PG).forEach(p=>{const b=document.createElement("button");b.textContent=p;b.dataset.p=p;b.onclick=()=>show(p);$("t7").appendChild(b)});
+const _pk=pick;pick=i=>{_pk(i);show(MPG[i],1)};
+show("JUMP");window.show7=show;
+})();
+// ---------- v8: Helldivers-style arming code ----------
+sim.seq="";sim.sp=0;sim.lk=0;SK.push("seq","sp","lk");
+const AR={U:"▲",D:"▼",L:"◀",R:"▶"};
+function newCode(){const n=4+Math.random()*6|0;let s="";for(let i=0;i<n;i++)s+="UDLR"[Math.random()*4|0];sim.seq=s;sim.sp=0}
+newCode();
+function arrow(d){if(sim.stage!=="IDLE"||sim.scram||sim.arm>=3||sim.lk>0)return;
+ if(d===sim.seq[sim.sp]){sim.sp++;beep(500+sim.sp*60,.05);if(sim.sp>=sim.seq.length){sim.arm=3;log("Arming code accepted — launch armed");toast("Launch armed")}}
+ else{sim.sp=0;sim.lk=1;beep(160,.2);toast("Wrong input — code reset",1)}}
+const armOn=()=>sim.stage==="IDLE"&&!sim.scram&&sim.arm<3;
+const key=d=>{if(MP.mode!=="solo"&&!perm(MP.role,"gate"))return deny("gate");cl()?send({k:"arw",d}):arrow(d)};
+const _ex=exec;exec=(c,r)=>{if(c.k==="arw"){if(perm(r,"gate")&&/^[UDLR]$/.test(c.d))arrow(c.d)}else _ex(c,r)};
+const KM={ArrowUp:"U",ArrowDown:"D",ArrowLeft:"L",ArrowRight:"R",w:"U",s:"D",a:"L",d:"R",W:"U",S:"D",A:"L",D:"R"};
+document.addEventListener("keydown",e=>{const d=KM[e.key];if(!d||mg.on||$("lob").classList.contains("on")||e.ctrlKey||e.metaKey||e.altKey||e.repeat||!armOn())return;
+ const t=e.target;if(t.matches&&t.matches("textarea,select,input:not([type=range])"))return;if(t.type==="range")t.blur();e.preventDefault();key(d)});
+const st8=document.createElement("style");st8.textContent=`#arw{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:10px;margin:6px 0;background:#06130a;border:2px solid #000;box-shadow:inset 0 0 14px #000,0 0 0 1px #4a525b;min-height:56px}
+#arw i{font:700 26px/1 Arial;font-style:normal;width:34px;height:40px;display:grid;place-items:center;color:#ffd24a;border:2px solid #5a4a10;background:#1a1606;text-shadow:0 0 8px #ffb300}
+#arw i.dn{color:#7dff9a;border-color:#2f8a52;background:#06130a;text-shadow:0 0 8px #3f9}#arw.bad i{color:#ff6b6b;border-color:#a01010;background:#2a0505;text-shadow:0 0 8px #f33}
+#pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,42px);gap:4px;justify-content:center;margin:6px 0}#pad .pb{min-width:0;padding:0;font-size:18px}`;document.head.appendChild(st8);
+[["U","2","1"],["L","1","2"],["D","2","2"],["R","3","2"]].forEach(([d,c,r])=>{const b=document.createElement("button");b.className="pb amb";b.textContent=AR[d];b.setAttribute("aria-label","Arrow "+d);b.style.gridArea=`${r}/${c}`;b.onclick=()=>armOn()&&key(d);$("pad").appendChild(b)});
+function drawCode(){const k=sim.seq+"|"+sim.sp+"|"+sim.arm+"|"+(sim.lk>0);if(drawCode.k===k)return;drawCode.k=k;
+ $("arw").innerHTML=[...sim.seq].map((c,i)=>`<i class="${sim.arm>=3||i<sim.sp?"dn":""}">${AR[c]}</i>`).join("");$("arw").className=sim.lk>0?"bad":""}
+// ---------- v9: navigation, shield, coolant valves, ring resonance ----------
+Object.assign(sim,{brg:0,elv:0,tb:0,te:0,sh:50,va:50,vb:50,res:0});SK.push("brg","elv","tb","te","sh","va","vb","res");
+const RB=[[260,300],[460,520],[640,700]],inBand=v=>v>5&&RB.some(([a,b])=>v>=a&&v<=b);
+const navErr=()=>{const d=Math.abs(sim.brg-sim.tb)%360;return Math.hypot(Math.min(d,360-d),sim.elv-sim.te)};
+const shReq=()=>Math.min(100,sim.out/CAP*85+(sim.evn==="SOLAR STORM"?20:0)+rx.flare*5),shEff=()=>on(14)?sim.sh:0,cvNeed=()=>sim.out/CAP*160,cvFlow=()=>(on(6)?sim.va:0)+(on(7)?sim.vb:0);
+const LB='style="font-size:10px;letter-spacing:.12em;color:#b8c4d0"';
+const mk9=(t,h,pg)=>{const s=document.createElement("section");s.innerHTML=`<h2>${t}</h2>${h}`;$("scrB").appendChild(s);SE7[t]=s;PG7[pg].push(t)};
+mk9("Navigation",`<div class="fb">${fd("brg","BEARING",0,359,1,0)}${fd("elv","ELEVATION",-45,45,1,0)}</div><div class="row"><span ${LB}>TARGET</span><span class="lcd" id="navT"></span></div><div class="row"><span ${LB}>SOLUTION ERROR</span><span class="lcd" id="navE"></span></div><small>Dial in the destination coordinates. Start needs an error of 2° or less. Stellar drift nudges the target every ~25 s while idle, and a new destination is issued after each contract or jump.</small>`,"JUMP");
+mk9("Ring resonance",`<div class="row"><span ${LB}>STATUS</span><span class="lcd" id="rsS"></span></div><small>Avoid ring speeds of 260–300, 460–520 and 640–700 km/s. Dwelling in a band shakes the coils, and 10 s trips the ring. Start is refused while in a band.</small>`,"RING");
+mk9("Radiation shield",`<div class="fb">${fd("sh","SHIELD",0,100,5,50)}</div><div class="row"><span ${LB}>SET / REQUIRED</span><span class="lcd" id="shS"></span></div><small>Required shielding follows reactor output (and storms and flares). More than 10 points short irradiates every module. More than 35 over wastes power as heat. Needs the SHD module online.</small>`,"REACTOR");
+mk9("Coolant valves",`<div class="fb">${fd("va","VALVE A",0,100,5,50)}${fd("vb","VALVE B",0,100,5,50)}</div><div class="row"><span ${LB}>FLOW / NEED</span><span class="lcd" id="cvS"></span></div><small>Only online loops flow. Too little flow heats the core. Total above 170 or valves more than 40 apart cavitates the pumps.</small>`,"REACTOR");
+["brg","elv"].forEach(k=>SETC[k]="gate");["sh","va","vb"].forEach(k=>SETC[k]="rx");
+["brg","elv","sh","va","vb"].forEach(k=>$(k).oninput=e=>sim[k]=+e.target.value);
+document.addEventListener("click",e=>{if(cl())return;const b=e.target.closest("button");if(!b||b.id!=="go")return;
+ if(navErr()>2){e.stopImmediatePropagation();e.preventDefault();alarm("Nav solution off by "+navErr().toFixed(1)+"° — lock within 2°")}
+ else if(inBand(sim.rim)){e.stopImmediatePropagation();e.preventDefault();alarm("Ring in resonance band — change speed first")}},true);
+let navK="",navT=25,rdT=0,cvT=0;
+function v9(){const dt=.1,nk=(sim.con?sim.con.name:"")+"|"+sim.jumps;
+ if(nk!==navK){navK=nk;sim.tb=Math.random()*360|0;sim.te=(Math.random()*60-30)|0}
+ if(sim.stage==="IDLE"&&(navT-=dt)<=0){navT=25;sim.tb=(sim.tb+(Math.random()<.5?-1:1)*(1+Math.random()*2)+360)%360;sim.te=cz(sim.te+(Math.random()<.5?-1:1)*(1+Math.random()*2),-40,40)}
+ const rq=shReq(),ef=shEff(),df=rq-ef;
+ if(sim.out>5){if(df>10){M.forEach(m=>{if(m.s==="online")m.h=Math.max(0,m.h-dt*(df-10)*.004)});if((rdT-=dt)<=0){rdT=10;alarm("Radiation leak — raise shield to "+rq.toFixed(0)+"%")}}
+  if(ef-rq>35)sim.temp+=dt*(ef-rq-35)*.0006}
+ const nd=cvNeed(),fl=cvFlow();if(nd>fl)sim.temp+=dt*(nd-fl)*.003;
+ if(sim.va+sim.vb>170)[6,7].filter(on).forEach(i=>M[i].h=Math.max(0,M[i].h-dt*.05));
+ if(on(6)&&on(7)&&Math.abs(sim.va-sim.vb)>40){const i=sim.va<sim.vb?6:7;M[i].h=Math.max(0,M[i].h-dt*.08);if((cvT-=dt)<=0){cvT=12;alarm("Coolant flow imbalance — cavitation in "+M[i].c)}}
+ if(inBand(sim.rim)){sim.res+=dt;[0,1].forEach(i=>M[i].h=Math.max(0,M[i].h-dt*.4));if(sim.res>10)doScram("ring resonance structural failure")}else sim.res=Math.max(0,sim.res-dt*.5)}
+const _t9=tick;tick=()=>{_t9();if(!cl())v9()};
+setInterval(()=>{const e=navErr(),rq=shReq(),ef=shEff(),nd=cvNeed(),fl=cvFlow(),T=(i,t,b)=>{$(i).textContent=t;$(i).classList.toggle("bad",!!b)};
+ T("navT",`BRG ${String(Math.round(sim.tb)).padStart(3,"0")}° ELV ${sim.te>=0?"+":""}${Math.round(sim.te)}°`);T("navE",e.toFixed(1)+"°",e>2);
+ $("brgV").textContent=sim.brg+"°";$("elvV").textContent=(sim.elv>0?"+":"")+sim.elv+"°";
+ T("rsS",inBand(sim.rim)?"RESONANCE "+sim.res.toFixed(0)+"/10 s":"CLEAR",inBand(sim.rim));
+ $("shV").textContent=sim.sh+"%";T("shS",`${ef.toFixed(0)}% / ${rq.toFixed(0)}%`,rq-ef>10);
+ $("vaV").textContent=sim.va+"%";$("vbV").textContent=sim.vb+"%";T("cvS",`${fl} / ${nd.toFixed(0)}`,nd>fl);
+ if(cl())["brg","elv","sh","va","vb"].forEach(k=>{const x=$(k);if(x!==document.activeElement&&+x.value!==sim[k])x.value=sim[k]})},200);
+show7("JUMP");
+newOffers();detail();log("Cold start: igniting reactor and engaging ring drive");rx.st="IGNITING";setInterval(tick,100);tick();
+
+/* ---- master power switch: all modules on / all off ---- */
+(function(){
+ const btn=document.getElementById("allMods");
+ const allowed=i=>MP.mode==="solo"||perm(MP.role,mo(i));
+ const allOn=()=>M.every(m=>m.s==="online");
+ function refresh(){const on=allOn();btn.textContent=on?"Power down all modules":"Power up all modules";btn.classList.toggle("lit",on)}
+ btn.onclick=()=>{
+  const down=allOn();
+  M.forEach((m,i)=>{
+   if(!allowed(i))return;
+   if(down){if(m.s==="online")toggle(i)}
+   else if(m.s!=="online")toggle(i);
+  });
+  refresh();
+ };
+ setInterval(refresh,250);refresh();
+})();
+</script>
+<style id="reactor-room">
+/* ===== One huge control-room panel: annunciator wall + gate screen up top, full console desk below ===== */
+body,body.min{display:flex!important;flex-direction:column;height:100vh!important;overflow:hidden!important}
+#LC{flex:none;height:46vh!important;min-height:300px;overflow:hidden;display:grid!important;grid-template-columns:minmax(0,1fr) auto minmax(0,1.15fr);gap:10px;align-content:stretch;padding:8px 12px}
+#LC .mid{align-self:center}
+#LC .sheet{width:min(100%,calc(46vh - 56px))!important;min-width:0!important;margin:0}
+#wall{overflow:auto;min-height:0;align-content:start;scrollbar-width:thin}
+#mimic{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:min-content;gap:3px;padding:6px;background:#10151b;border:4px ridge #29313b;box-shadow:inset 0 0 20px #000;overflow:auto;min-height:0;scrollbar-width:thin}
+#mimic i{display:block;padding:5px 4px;font:700 7.5px var(--fm);letter-spacing:.04em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#34414d;background:#07090c;border:1px solid #000;box-shadow:inset 0 0 0 2px #1b2128;cursor:default}
+#mimic i.m{cursor:pointer}
+#mimic i.g{color:#6dffb0;background:#06130a;text-shadow:0 0 5px #3f9}#mimic i.a{color:#ffb347;background:#1a1204;text-shadow:0 0 5px #fa0}#mimic i.r{color:#ff8080;background:#2a0505;text-shadow:0 0 6px #f33}
+#mimic i.bl{animation:bl .8s steps(2) infinite}
+#BIG{flex:1;min-height:0;height:auto!important;display:flex!important;flex-direction:column;padding:4px 12px 12px}
+#t7,#scrT{display:none!important}
+#scrB{flex:1;min-height:0;zoom:1!important;display:grid!important;grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:minmax(340px,24vw);gap:14px;align-items:start;align-content:start;overflow:auto;padding:14px;border:10px ridge #29313b!important;border-radius:6px!important;background:linear-gradient(#1c232b,#10151b)!important;box-shadow:inset 0 0 40px #000,0 0 0 2px #000!important}
+.zone{display:grid;gap:10px;align-content:start}
+#scrB section{display:block!important}
+@media(max-width:1000px){body,body.min{display:block!important;height:auto!important;overflow:auto!important}#LC{height:auto!important;grid-template-columns:1fr}#mimic{height:140px}#BIG{height:auto!important}#scrB{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:1fr!important}}
+</style>
+<script>
+(()=>{const $=i=>document.getElementById(i),L=$("LC"),R=$("scrB");if(!L||!R)return;
+const m=document.createElement("div");m.id="mimic";
+const stg=()=>["CHARGE","ALIGN","OPEN"].includes(sim.stage),T=[
+["SCRAM",()=>sim.scram?"rb":""],["ALARM",()=>$("abar").classList.contains("bad")?"rb":""],
+["REACTOR",()=>rx.st==="OFF"?"":rx.st==="SCRAMMED"?"rb":rx.st==="IGNITING"?"ab":"g"],
+["JUMP SEQ",()=>sim.stage==="IDLE"?"":sim.stage==="COOLDOWN"?"a":"gb"],
+["CORE HOT",()=>sim.temp>=16?"rb":sim.temp>12?"a":""],["OVERLOAD",()=>sim.load>sim.out?"rb":""],
+["SHIELD LOW",()=>shReq()-shEff()>10?"rb":""],["COOLANT LOW",()=>cvNeed()>cvFlow()?"ab":""],
+["RING RESONANCE",()=>inBand(sim.rim)?"rb":""],["NAV ERROR",()=>navErr()>2?"a":""],
+["EVENT",()=>sim.evn&&sim.evn!=="NONE"?"ab":""]];
+M.forEach((o,i)=>T.push([o.c,()=>o.s==="fault"?"rb":o.s==="offline"?"":o.h<30?"a":"g",()=>pick(i)]));
+["COIL/CAP","COOLANT","CONTAIN","INJECTOR","FOC/EMT/TUN","OUTPUT","RING SPD","LOAD","CORE TEMP","RESERVOIR","PHASE ERR","RING SETTLE","TUNER CAL"].forEach((l,k)=>T.push(["GATE "+l,(a)=>a[k].ok?"g":stg()?"rb":"a"]));
+["INJ","CONTAIN","RESERVOIR","FIELD"].forEach((l,k)=>T.push(["IGN "+l,(a,b)=>b[k].ok?"g":"a"]));
+const E=T.map(([l,f,c])=>{const t=document.createElement("i");t.textContent=l;t.title=l;if(c){t.className="m";t.onclick=c}m.appendChild(t);return t});
+const up=()=>{try{const a=ilk(),b=rilk();T.forEach(([l,f],k)=>{const s=f(a,b)||"";E[k].className=(E[k].onclick?"m ":"")+(s?s[0]+(s[1]=="b"?" bl":""):"")})}catch(e){}};
+setInterval(up,200);up();
+L.prepend(m);
+const Z={JUMP:"JUMP & NAVIGATION",ALIGN:"APERTURE & TELEMETRY",RING:"RING DRIVE",REACTOR:"STELLAR REACTOR",MODULES:"COILS & SYSTEMS",OPS:"OPERATIONS"},zs=[];
+for(const p in Z){const z=document.createElement("div");z.className="zone";z.innerHTML='<div class="cplate">'+Z[p]+'</div>';(p=="MODULES"?["Coils & systems"]:PG7[p]).forEach(k=>{const e=SE7[k];if(e){e.style.order="";z.appendChild(e)}});R.appendChild(z);zs.push(z)}
+[...R.children].filter(c=>c.tagName=="SECTION").forEach(c=>zs[zs.length-1].appendChild(c))})();
+</script>
+<style id="modular">
+/* panels are fixed in place: nothing reorders them, not even module selection */
+#scrB section,.zone>section{order:0!important}
+#scrB{grid-auto-columns:var(--zw,340px)!important}
+#LC{height:var(--wh,46vh)!important}#LC .sheet{width:min(100%,calc(var(--wh,46vh) - 56px))!important}
+body.nom #mimic{display:none}body.nom #LC{grid-template-columns:auto minmax(0,1fr)}
+#LC section.hid,#scrB section.hid{display:none!important}
+#cz{display:none;position:fixed;right:14px;bottom:14px;width:300px;max-height:82vh;overflow:auto;z-index:60;padding:12px;background:#18212b;border:3px ridge #29313b;box-shadow:0 8px 30px #000;font:11px Arial;color:#cfd8e0}
+body.edit #cz{display:block}#cz small{display:block;margin:4px 0 8px}
+#cz .row{margin:4px 0}#cz input[type=range]{width:55%}
+#czl{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin:8px 0;font-size:10px}#czl label{display:flex;gap:5px;align-items:center}
+#cz .btns{gap:6px}#cz .pb{min-width:0;padding:8px 6px}
+</style>
+<script>
+(()=>{const $=i=>document.getElementById(i),B=document.body,KEY="ultrarune-layout-v2";if(!window.SE7)return;
+const nm=k=>k==="mstr"?"Master controls":k;
+const cz=document.createElement("div");cz.id="cz";cz.innerHTML=`<div class="cplate" style="margin-bottom:8px">CUSTOMIZE</div><small>Show or hide panels and resize the wall and columns. Panels stay exactly where they are.</small>
+<div class="row"><span>Wall height</span><input type="range" id="czh" min="25" max="70" value="46"></div>
+<div class="row"><span>Column width</span><input type="range" id="czw" min="260" max="560" step="10" value="340"></div>
+<div class="row"><label><input type="checkbox" id="czm" checked> Annunciator wall</label></div><div id="czl"></div>
+<div class="btns"><button class="pb red" id="czr">Reset</button><button class="pb grn" id="czd">Done</button></div>`;
+B.appendChild(cz);
+const ser=()=>({w:+$("czw").value,h:+$("czh").value,m:$("czm").checked,x:Object.keys(SE7).filter(k=>SE7[k].classList.contains("hid"))});
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(ser()))}catch(e){}};
+const vars=()=>{B.style.setProperty("--zw",$("czw").value+"px");B.style.setProperty("--wh",$("czh").value+"vh");B.classList.toggle("nom",!$("czm").checked)};
+const list=()=>{$("czl").innerHTML="";Object.keys(SE7).forEach(k=>{const l=document.createElement("label"),c=document.createElement("input");c.type="checkbox";c.checked=!SE7[k].classList.contains("hid");c.onchange=()=>{SE7[k].classList.toggle("hid",!c.checked);save()};l.append(c,nm(k));$("czl").appendChild(l)})};
+const apply=D=>{$("czw").value=D.w;$("czh").value=D.h;$("czm").checked=D.m;vars();Object.keys(SE7).forEach(k=>SE7[k].classList.toggle("hid",(D.x||[]).includes(k)));list()};
+const DEF=ser();try{const s=localStorage.getItem(KEY);if(s)apply(JSON.parse(s))}catch(e){}
+list();
+const b=document.createElement("button");b.id="cust";b.textContent="CUSTOMIZE";b.onclick=()=>B.classList.toggle("edit");$("bsc").before(b);
+$("czd").onclick=()=>B.classList.remove("edit");
+$("czr").onclick=()=>{apply(DEF);try{localStorage.removeItem(KEY)}catch(e){}};
+["czh","czw"].forEach(i=>$(i).oninput=()=>{vars();save()});$("czm").onchange=()=>{vars();save()};
+})();
+</script>
+<script>
+/* ---- local browser saving: autosave + restore of the whole simulation ---- */
+(function(){
+ const KEY="ultrarune.save.v1";let noSave=false;
+ const rec=document.getElementById("rec");
+ const bar=document.createElement("div");bar.className="btns";
+ bar.innerHTML='<button class="pb grn" id="svNow">Save now</button><button class="pb red" id="svNew">New game</button>';
+ const st=document.createElement("small");st.id="saveSt";st.style.cssText="display:block;margin-top:8px;opacity:.8";
+ rec.appendChild(bar);rec.appendChild(st);
+ const hhmm=t=>new Date(t).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+ function save(manual){
+  if(noSave)return;
+  if(MP.mode==="client"){st.textContent="Autosave paused while joined to a crew (the host keeps the save).";return}
+  try{
+   const ts=Date.now();
+   localStorage.setItem(KEY,JSON.stringify({v:1,ts,d:snapObj(),ex:{pe:sim.pe,po:sim.po,sel:sim.sel}}));
+   st.textContent="Saved in this browser at "+hhmm(ts)+" · autosaves every 5 s";
+   if(manual)toast("Game saved");
+  }catch(e){st.textContent="Saving unavailable in this browser (storage blocked or full).";if(manual)toast("Could not save",1)}
+ }
+ function restore(){
+  let raw=null;try{raw=localStorage.getItem(KEY)}catch(e){}
+  if(!raw){st.textContent="No saved game yet · autosaves every 5 s";return}
+  try{
+   const o=JSON.parse(raw),d=o&&o.d;
+   if(!d||!d.s||!d.x||!Array.isArray(d.m)||d.m.length!==M.length||!Array.isArray(d.o))throw new Error("bad save");
+   applySnap(d);
+   if(o.ex){if(isFinite(o.ex.pe))sim.pe=o.ex.pe;if(isFinite(o.ex.po))sim.po=o.ex.po;if(M[o.ex.sel|0])sim.sel=o.ex.sel|0}
+   detail();ui();
+   log("Saved game restored ("+new Date(o.ts).toLocaleString()+")");
+   st.textContent="Restored the save from "+hhmm(o.ts)+" · autosaves every 5 s";
+  }catch(e){try{localStorage.removeItem(KEY)}catch(_){}st.textContent="Saved game was unreadable and has been discarded.";}
+ }
+ document.getElementById("svNow").onclick=()=>save(true);
+ document.getElementById("svNew").onclick=()=>{
+  if(!confirm("Erase the saved game and restart from a cold start? Achievements and screen layout are kept."))return;
+  noSave=true;try{localStorage.removeItem(KEY)}catch(e){}location.reload();
+ };
+ restore();
+ setInterval(()=>save(false),5000);
+ addEventListener("pagehide",()=>save(false));
+ document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")save(false)});
+})();
+</script>
+</body>
+</html>
