@@ -219,8 +219,6 @@ body.min .mid:hover .sheet,body.min .mid:has(:focus-visible) .sheet{display:bloc
 /* ---- v5 shop, events, record ---- */
 #ups{display:grid;grid-template-columns:1fr 1fr;gap:8px}#ups .pb{display:grid;gap:3px;text-align:left;padding:8px 9px;font-size:10px;line-height:1.2}
 #ups .pb small{font:9.5px Arial;letter-spacing:0;opacity:.8}#ups .pb.own{opacity:1;border-color:#2f8a52;color:#8cf5ad;text-shadow:0 0 6px #3f9}#ups .pb .cs{font:11px var(--fm);color:#ffd27a}
-#ach{display:flex;flex-wrap:wrap;gap:6px}.ac{padding:5px 8px;font:700 9.5px Arial;letter-spacing:.06em;border-radius:3px;background:#07090c;border:1px solid #2a323b;color:#5d6b7a}.ac.on{color:#bfeaff;border-color:#5fd0ff;box-shadow:0 0 10px #5fd0ff44;text-shadow:0 0 6px #5fd0ff}
-#evc{animation:bl 1.2s steps(2) infinite}#evc.good{color:#7dff9a;border-color:#2f8a52;animation:none}#evc.bad{color:#ffb347;border-color:#ffb347}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
@@ -234,7 +232,7 @@ body.min .mid:hover .sheet,body.min .mid:has(:focus-visible) .sheet{display:bloc
 <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b5fa8"/><stop offset="1" stop-color="#7cc4f5"/></linearGradient>
 <linearGradient id="gnd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9b6a3a"/><stop offset="1" stop-color="#3d2610"/></linearGradient>
 <clipPath id="hzc"><circle cx="50" cy="50" r="40"/></clipPath></defs></svg>
-<div id="bar"><span class="logo">◈ ULTRARUNE</span><div id="abar" role="status">ALL SYSTEMS NOMINAL</div><div id="crew"></div><span class="chip" id="evc" hidden></span><span class="chip" id="chip">SOLO</span><button id="bsc">SCRAM</button><button id="mpb">MULTIPLAYER</button></div>
+<div id="bar"><span class="logo">◈ ULTRARUNE</span><div id="abar" role="status">ALL SYSTEMS NOMINAL</div><div id="crew"></div><span class="chip" id="chip">SOLO</span><button id="bsc">SCRAM</button><button id="mpb">MULTIPLAYER</button></div>
 <div id="toasts" aria-live="polite"></div>
 <div id="lob" role="dialog" aria-label="Multiplayer"><section style="width:min(440px,92vw)"><h2>Crew link</h2>
  <div class="row"><label for="mname">CALLSIGN</label><input id="mname" maxlength="14"></div>
@@ -263,7 +261,6 @@ body.min .mid:hover .sheet,body.min .mid:has(:focus-visible) .sheet{display:bloc
     <section><h2>Gate interlocks</h2><div class="ann" id="ilk"></div></section>
     <section id="sys"><h2>Coils &amp; systems</h2><div class="mods" id="list"></div><button id="allMods" class="pb amb" style="width:100%;margin-top:10px"></button><div id="detail"></div></section>
 <section id="shop"><h2>Ship upgrades</h2><div id="ups"></div></section>
-<section id="rec"><h2>Service record</h2><div id="ach"></div></section>
 </aside>
 <div class="mid"><main class="sheet" id="sheet"><svg id="svg" viewBox="0 0 1000 1000" role="img" aria-label="Interactive blueprint of The Ultrarune jump gate and reactor"></svg></main><div class="vbar"><div class="plate">MAIN VIEWSCREEN - GATE &amp; REACTOR SCHEMATIC</div><button id="gh" aria-label="Hide or show the gate display">HIDE GATE</button></div></div>
 <aside id="R"><section class="comp"><h2>Mission computer</h2>
@@ -661,33 +658,18 @@ $("mcopy").onclick=async()=>{const t=$("mlink");t.select();try{await navigator.c
  addEventListener("resize",rs);rs();let t0=0;const f=t=>{requestAnimationFrame(f);if(document.hidden||t-t0<33)return;t0=t;x.clearRect(0,0,W,H);
   for(const s of st){s.x-=.05*s.z;if(s.x<0)s.x=W;const a=.35+.45*Math.sin(t/900*s.z+s.p);x.fillStyle=`rgba(${s.z>.8?"255,230,200":"190,225,255"},${a*s.z})`;x.fillRect(s.x,s.y,s.z*1.8,s.z*1.8)}};requestAnimationFrame(f)})();
 
-// ---------- v5: upgrades, random events, service record ----------
+// ---------- v5: upgrades, random events ----------
 const UP=[["Nano-repair gel","Rapidly heals every powered-down module",1500],["Heat sinks","Core runs cooler under load",1750],["Phase damper","Calms phase drift automatically",2250],["Plasma cache","Reservoir refills faster",2000]];
-sim.upm=0;sim.evn="";sim.evt=0;SK.push("upm","evn","evt");let evNext=70+Math.random()*50,evBad=1;
+sim.upm=0;SK.push("upm");
 UP.forEach((u,i)=>{const b=document.createElement("button");b.className="pb";b.id="up"+i;b.innerHTML=`<b>${u[0]}</b><small>${u[1]}</small><span class="cs"></span>`;$("ups").appendChild(b);CLK["up"+i]="gate";
  b.onclick=()=>{if(sim.upm>>i&1)return;if(sim.cr<u[2])return alarm(`Not enough credits (${u[2]} cr)`);sim.cr-=u[2];sim.upm|=1<<i;log("Installed upgrade: "+u[0]);toast("Installed: "+u[0])}});
-const EV=[
- ["SOLAR STORM",20,1,()=>alarm("Solar storm — core heating for 20 s")],
- ["ION STORM",15,1,()=>alarm("Ion storm — phase drift unstable for 15 s")],
- ["DEBRIS FIELD",5,1,()=>{[0,0].forEach(()=>{const m=M[Math.random()*16|0];m.h=Math.max(0,m.h-25)});alarm("Debris field — two modules damaged");detail()}],
- ["PLASMA LEAK",5,1,()=>{rx.resv=Math.max(0,rx.resv-14);alarm("Plasma leak — reservoir −14%")}],
- ["SUPPLY DROP",6,0,()=>{sim.cr+=150;log("Supply drop recovered: +150 cr");toast("Supply drop: +150 cr")}]];
-let evCur=-1;
 function ext(){const dt=.1,u=sim.upm|0,run=rx.st==="RUNNING";
  if(u&1)M.forEach(m=>{if(m.s==="offline")m.h=Math.min(100,m.h+dt*1.2)});
  if(u&2&&sim.temp>5)sim.temp-=dt*.035;
  if(u&4)sim.ph*=1-dt*.025;
- if(u&8&&run)rx.resv=Math.min(100,rx.resv+dt*.12);
- if(sim.evt>0){sim.evt=Math.max(0,sim.evt-dt);if(evCur===0)sim.temp+=dt*.06;if(evCur===1)sim.ph=Math.max(-40,Math.min(40,sim.ph+(Math.random()-.5)*dt*8));
-  if(sim.evt<=0){sim.evn="";if(evCur<2)log("Event cleared: "+EV[evCur][0].toLowerCase())}}
- else if(run&&!sim.scram){evNext-=dt;if(evNext<=0){evNext=75+Math.random()*60;evCur=Math.random()*EV.length|0;const e=EV[evCur];sim.evn=e[0];sim.evt=e[1];evBad=e[2];e[3]()}}}
+ if(u&8&&run)rx.resv=Math.min(100,rx.resv+dt*.12);}
 const _t4=tick;tick=()=>{_t4();if(!cl())ext()};
-setInterval(()=>{const c=$("evc");c.hidden=!sim.evn;if(sim.evn){c.textContent=sim.evn+" · "+Math.ceil(sim.evt)+"s";const g=/SUPPLY/.test(sim.evn);c.className="chip "+(g?"good":"bad")}},300);
-const ACH=[["First jump","Complete one jump",()=>sim.jumps>=1],["Frequent flyer","Complete 10 jumps",()=>sim.jumps>=10],["Veteran","Complete 25 jumps",()=>sim.jumps>=25],["Tycoon","Hold 2000 credits",()=>sim.cr>=2000],["Fully fitted","Own every upgrade",()=>(sim.upm|0)===15],["Weathered","Survive an event while the reactor runs",()=>sim.evn===""&&evSeen]];
-let evSeen=false,got=[];try{got=JSON.parse(localStorage.getItem("ultrarune.ach")||"[]")}catch(e){}
-$("ach").innerHTML=ACH.map((a,i)=>`<span class="ac" id="ac${i}" title="${a[1]}">${a[0]}</span>`).join("");
-setInterval(()=>{if(sim.evn)evSeen=true;
- ACH.forEach((a,i)=>{let ok=false;try{ok=a[2]()}catch(e){}if(ok&&!got.includes(i)){got.push(i);try{localStorage.setItem("ultrarune.ach",JSON.stringify(got))}catch(e){}toast("Achievement: "+a[0])}$("ac"+i).classList.toggle("on",got.includes(i))});
+setInterval(()=>{
  UP.forEach((u,i)=>{const b=$("up"+i),own=sim.upm>>i&1;b.classList.toggle("own",!!own);b.querySelector(".cs").textContent=own?"INSTALLED":u[2]+" cr";b.disabled=!!own||sim.cr<u[2]&&!own&&false})},500);
 // ---------- v6: harder controls ----------
 Object.assign(sim,{arm:0,cap:[50,50,50,50],fx:0,fy:0,tx:0,ty:0,lock:0,bad:0,prime:0,primed:false});
@@ -713,7 +695,7 @@ function v6(){const dt=.1,s=sim.stage,act=s==="CHARGE"||s==="ALIGN"||s==="OPEN";
  if(rx.st!=="OFF"){sim.primed=false;sim.prime=0}
  if(rx.st==="IGNITING"&&rx.thr>40)rx.breach+=dt*1.5;
  if(!act)return;
- const k=(2+(100-M[11].h)/25+(sim.temp>14?3:0))*(sim.evn==="ION STORM"?3:1);
+ const k=(2+(100-M[11].h)/25+(sim.temp>14?3:0));
  sim.tx=cz(sim.tx+(Math.random()-.5)*dt*k,-45,45);sim.ty=cz(sim.ty+(Math.random()-.5)*dt*k,-45,45);
  const e=Math.hypot(sim.fx-sim.tx,sim.fy-sim.ty);
  if(s==="ALIGN"){sim.lock=e<=4?sim.lock+dt:Math.max(0,sim.lock-2*dt);sim.t=Math.min(sim.t,sim.lock)}
@@ -754,7 +736,7 @@ const lc=document.createElement("div");lc.id="LC";const wall=document.createElem
 document.body.insertBefore(lc,$("L"));lc.append(document.querySelector(".mid"),wall);
 document.querySelector(".plate").textContent="MIMIC PANEL — CLICK A MODULE TO OPEN ITS CONTROLS";
 const big=document.createElement("div");big.id="BIG";big.innerHTML='<div class="tabs" id="t7"></div><div id="scrT"></div><div id="scrB"></div>';document.body.insertBefore(big,$("L"));
-const PG=window.PG7={JUMP:["Jump planner","Jump sequence","Launch arming"],ALIGN:["Aperture alignment","Gate telemetry"],RING:["Ring drive","Capacitor routing"],REACTOR:["Stellar reactor","Reactor controls","Injector priming","Reactor telemetry"],OPS:["Mission computer","Ship upgrades","Service record"],MODULES:[]};
+const PG=window.PG7={JUMP:["Jump planner","Jump sequence","Launch arming"],ALIGN:["Aperture alignment","Gate telemetry"],RING:["Ring drive","Capacitor routing"],REACTOR:["Stellar reactor","Reactor controls","Injector priming","Reactor telemetry"],OPS:["Mission computer","Ship upgrades"],MODULES:[]};
 const MPG=["RING","RING","RING","RING","RING","RING","REACTOR","REACTOR","REACTOR","REACTOR","REACTOR","ALIGN","ALIGN","JUMP","REACTOR","REACTOR"];
 const used=new Set(["mstr","Gate interlocks","Ignition checks"]);
 for(const k in SE)if(!used.has(k))$("scrB").appendChild(SE[k]);
@@ -763,7 +745,7 @@ function show(p,mod){[...$("t7").children].forEach(b=>b.classList.toggle("on",b.
  for(const k in SE){if(used.has(k))continue;const i=l.indexOf(k);SE[k].style.display=i<0?"none":"";SE[k].style.order=i;if(i>=0)SE[k].classList.remove("col")}
  $("scrT").textContent="SCREEN · "+p+(mod||p==="MODULES"?" · "+M[sim.sel].c+" "+M[sim.sel].n.toUpperCase():"")}
 Object.keys(PG).forEach(p=>{const b=document.createElement("button");b.textContent=p;b.dataset.p=p;b.onclick=()=>show(p);$("t7").appendChild(b)});
-const _pk=pick;pick=i=>{_pk(i);show(MPG[i],1)};
+/* module clicks only select the module; panels never switch or move */
 show("JUMP");window.show7=show;
 })();
 // ---------- v8: Helldivers-style arming code ----------
@@ -791,12 +773,12 @@ function drawCode(){const k=sim.seq+"|"+sim.sp+"|"+sim.arm+"|"+(sim.lk>0);if(dra
 Object.assign(sim,{brg:0,elv:0,tb:0,te:0,sh:50,va:50,vb:50,res:0});SK.push("brg","elv","tb","te","sh","va","vb","res");
 const RB=[[260,300],[460,520],[640,700]],inBand=v=>v>5&&RB.some(([a,b])=>v>=a&&v<=b);
 const navErr=()=>{const d=Math.abs(sim.brg-sim.tb)%360;return Math.hypot(Math.min(d,360-d),sim.elv-sim.te)};
-const shReq=()=>Math.min(100,sim.out/CAP*85+(sim.evn==="SOLAR STORM"?20:0)+rx.flare*5),shEff=()=>on(14)?sim.sh:0,cvNeed=()=>sim.out/CAP*160,cvFlow=()=>(on(6)?sim.va:0)+(on(7)?sim.vb:0);
+const shReq=()=>Math.min(100,sim.out/CAP*85+rx.flare*5),shEff=()=>on(14)?sim.sh:0,cvNeed=()=>sim.out/CAP*160,cvFlow=()=>(on(6)?sim.va:0)+(on(7)?sim.vb:0);
 const LB='style="font-size:10px;letter-spacing:.12em;color:#b8c4d0"';
 const mk9=(t,h,pg)=>{const s=document.createElement("section");s.innerHTML=`<h2>${t}</h2>${h}`;$("scrB").appendChild(s);SE7[t]=s;PG7[pg].push(t)};
 mk9("Navigation",`<div class="fb">${fd("brg","BEARING",0,359,1,0)}${fd("elv","ELEVATION",-45,45,1,0)}</div><div class="row"><span ${LB}>TARGET</span><span class="lcd" id="navT"></span></div><div class="row"><span ${LB}>SOLUTION ERROR</span><span class="lcd" id="navE"></span></div><small>Dial in the destination coordinates. Start needs an error of 2° or less. Stellar drift nudges the target every ~25 s while idle, and a new destination is issued after each contract or jump.</small>`,"JUMP");
 mk9("Ring resonance",`<div class="row"><span ${LB}>STATUS</span><span class="lcd" id="rsS"></span></div><small>Avoid ring speeds of 260–300, 460–520 and 640–700 km/s. Dwelling in a band shakes the coils, and 10 s trips the ring. Start is refused while in a band.</small>`,"RING");
-mk9("Radiation shield",`<div class="fb">${fd("sh","SHIELD",0,100,5,50)}</div><div class="row"><span ${LB}>SET / REQUIRED</span><span class="lcd" id="shS"></span></div><small>Required shielding follows reactor output (and storms and flares). More than 10 points short irradiates every module. More than 35 over wastes power as heat. Needs the SHD module online.</small>`,"REACTOR");
+mk9("Radiation shield",`<div class="fb">${fd("sh","SHIELD",0,100,5,50)}</div><div class="row"><span ${LB}>SET / REQUIRED</span><span class="lcd" id="shS"></span></div><small>Required shielding follows reactor output (and flares). More than 10 points short irradiates every module. More than 35 over wastes power as heat. Needs the SHD module online.</small>`,"REACTOR");
 mk9("Coolant valves",`<div class="fb">${fd("va","VALVE A",0,100,5,50)}${fd("vb","VALVE B",0,100,5,50)}</div><div class="row"><span ${LB}>FLOW / NEED</span><span class="lcd" id="cvS"></span></div><small>Only online loops flow. Too little flow heats the core. Total above 170 or valves more than 40 apart cavitates the pumps.</small>`,"REACTOR");
 ["brg","elv"].forEach(k=>SETC[k]="gate");["sh","va","vb"].forEach(k=>SETC[k]="rx");
 ["brg","elv","sh","va","vb"].forEach(k=>$(k).oninput=e=>sim[k]=+e.target.value);
@@ -822,6 +804,73 @@ setInterval(()=>{const e=navErr(),rq=shReq(),ef=shEff(),nd=cvNeed(),fl=cvFlow(),
  $("shV").textContent=sim.sh+"%";T("shS",`${ef.toFixed(0)}% / ${rq.toFixed(0)}%`,rq-ef>10);
  $("vaV").textContent=sim.va+"%";$("vbV").textContent=sim.vb+"%";T("cvS",`${fl} / ${nd.toFixed(0)}`,nd>fl);
  if(cl())["brg","elv","sh","va","vb"].forEach(k=>{const x=$(k);if(x!==document.activeElement&&+x.value!==sim[k])x.value=sim[k]})},200);
+/* ---------- v10: fuel logistics, cargo contracts, more events, jump wear, save panel ---------- */
+(function(){
+ sim.fuel=100;SK.push("fuel");
+ const FP=4,BURN=.15,fm=()=>(sim.upm|0)&16?.7:1;
+
+ /* two more upgrades */
+ UP.push(["Efficient injectors","Reactor and jumps burn 30% less fuel",1800],["Spare coil set","Jump wear on gate systems is halved",1600]);
+ [4,5].forEach(i=>{const u=UP[i],b=document.createElement("button");b.className="pb";b.id="up"+i;b.innerHTML=`<b>${u[0]}</b><small>${u[1]}</small><span class="cs"></span>`;$("ups").appendChild(b);CLK["up"+i]="gate";
+  b.onclick=()=>{if(sim.upm>>i&1)return;if(sim.cr<u[2])return alarm(`Not enough credits (${u[2]} cr)`);sim.cr-=u[2];sim.upm|=1<<i;log("Installed upgrade: "+u[0]);toast("Installed: "+u[0])}});
+
+ /* fuel panel */
+ mk9("Fuel & logistics",`<div class="row"><span ${LB}>DEUTERIUM</span><span class="lcd" id="fuS"></span></div><div class="bar" id="fuB"><i></i></div><div class="row"><span ${LB}>BURN RATE</span><span class="lcd" id="fuR"></span></div><div class="row"><span ${LB}>CARGO</span><span class="lcd" id="cgS"></span></div><div class="btns"><button class="pb amb" id="fu10">Buy +10%</button><button class="pb grn" id="fuF">Fill tank</button></div><small id="cgN"></small><small>The reactor burns fuel in proportion to its output, and every jump burns extra. Fuel costs ${FP} cr per 1% and can only be bought between jumps. Ignition needs 5% and a jump needs about 0.8% per light-year in the tank. At 0% the reactor flames out and SCRAMs.</small>`,"REACTOR");
+ CLK.fu10=CLK.fuF="rx";
+ function buy(pct){
+  if(sim.stage!=="IDLE"&&sim.stage!=="COOLDOWN")return alarm("Refuel between jumps only");
+  const room=100-sim.fuel;if(room<.5)return alarm("Tank is full");
+  if(sim.fuel<5&&sim.cr<FP*5){sim.fuel+=5;log("Emergency reserve tapped: +5% fuel (free)");return}
+  const p=Math.min(pct,room),c=Math.ceil(p*FP);
+  if(sim.cr>=c){sim.cr-=c;sim.fuel=Math.min(100,sim.fuel+p);log(`Refuelled +${p.toFixed(0)}% (−${c} cr)`)}
+  else{const a=Math.floor(sim.cr/FP);if(a<1)return alarm(`Not enough credits (${FP} cr per 1%)`);sim.cr-=a*FP;sim.fuel+=a;log(`Refuelled +${a}% (−${a*FP} cr), all you could afford`)}}
+ $("fu10").onclick=()=>buy(10);$("fuF").onclick=()=>buy(100);
+
+ /* cargo contracts */
+ const CG={Fragile:[1.4,1,"Average phase error must stay ≤3° in the aperture, or the payout is halved"],Hazmat:[1.5,1,"Radiation shield must be ≥70% and online at launch; a breach in flight costs 60% of the pay"],Rush:[1.35,.75,"Short deadline"],Medical:[1.25,.9,"Failing this contract costs double"],Standard:[1,1,""]};
+ const tag=()=>sim.offers.forEach(o=>{if(o.cargo)return;const k=Math.random()<.3?"Standard":["Fragile","Hazmat","Rush","Medical"][Math.random()*4|0],c=CG[k];o.cargo=k;o.pay=Math.round(o.pay*c[0]/10)*10;o.t0=Math.round(o.t0*c[1])});
+ const _no=newOffers;newOffers=function(){_no();tag();drawOffers()};
+ const _do=drawOffers;drawOffers=function(){_do();[...$("offers").children].forEach((b,i)=>{const o=sim.offers[i];if(o&&o.cargo){if(o.cargo!=="Standard")b.textContent+=" · "+o.cargo.toUpperCase();b.title=CG[o.cargo][2]}})};
+ const _fc=failCon;failCon=function(why,f){const c=sim.con;if(c&&c.cargo==="Medical")f=(f==null?.3:f)*2;return _fc(why,f)};
+ let hz=0;
+ const _dl=deliver;deliver=function(){
+  const c=sim.con;
+  if(c&&c.cargo==="Fragile"&&sim.pe/Math.max(1,sim.po)>3){c.pay=Math.round(c.pay/2);log("Fragile cargo shaken by phase error: payout halved")}
+  _dl();
+  sim.fuel=Math.max(0,sim.fuel-sim.dist*.5*fm());
+  const w=sim.dist*.3*((sim.upm|0)&32?.5:1);
+  [11,12,13,14,15].forEach(i=>{if(on(i))M[i].h=Math.max(0,M[i].h-w)});[8,9,10].forEach(i=>{if(on(i))M[i].h=Math.max(0,M[i].h-w/2)});
+  hz=0};
+ tag();drawOffers();
+
+ /* simulation hook */
+ let lowT=0;
+ const _t10=tick;tick=()=>{_t10();if(!cl())v10()};
+ function v10(){const dt=.1;
+  if(sim.out>1&&!sim.scram)sim.fuel=Math.max(0,sim.fuel-dt*sim.out/CAP*BURN*fm());
+  if(sim.fuel>0&&sim.fuel<20&&(lowT-=dt)<=0){lowT=25;alarm("Fuel low: "+sim.fuel.toFixed(0)+"% remaining")}
+  if(sim.fuel<=0&&!sim.scram&&rx.st!=="OFF"&&rx.st!=="SCRAMMED")doScram("fuel exhausted");
+  const c=sim.con;
+  if(c&&c.cargo==="Hazmat"&&sim.stage==="OPEN"){if(shReq()-shEff()>5){if((hz+=dt)>4){hz=0;failCon("hazmat containment breach",.6);abort("hazmat containment breach")}}else hz=Math.max(0,hz-dt)}}
+
+ /* launch / ignition gates */
+ document.addEventListener("click",e=>{if(cl())return;const b=e.target.closest("button");if(!b)return;
+  const stop=m=>{e.stopImmediatePropagation();e.preventDefault();alarm(m)};
+  if(b.id==="ign"&&sim.fuel<5)stop("Fuel below 5%: refuel before ignition");
+  else if(b.id==="go"&&sim.fuel<sim.dist*.8)stop("Not enough fuel for this jump (need "+(sim.dist*.8).toFixed(0)+"%)");
+  else if(b.id==="go"&&sim.con&&sim.con.cargo==="Hazmat"&&shEff()<70)stop("Hazmat cargo: raise the radiation shield to 70% and keep it online")},true);
+
+ /* panel readout */
+ setInterval(()=>{const f=sim.fuel,r=sim.out>1&&!sim.scram?sim.out/CAP*BURN*60*fm():0,c=sim.con,ct=Math.ceil((100-f)*FP);
+  $("fuS").textContent=f.toFixed(1)+"%";$("fuS").classList.toggle("bad",f<20);$("fuB").firstChild.style.width=f+"%";
+  $("fuR").textContent=r.toFixed(1)+" %/min";
+  $("cgS").textContent=c?(c.cargo||"Standard").toUpperCase():"NONE";$("cgN").textContent=c&&c.cargo&&CG[c.cargo][2]?CG[c.cargo][2]+".":"";
+  $("fu10").textContent="Buy +10% · "+Math.min(40,ct)+" cr";$("fuF").textContent="Fill tank · "+ct+" cr"},250);
+
+ /* save controls live in their own panel now */
+ mk9("Save data",`<div class="btns"><button class="pb grn" id="svNow">Save now</button><button class="pb red" id="svNew">New game</button></div><small id="saveSt" style="display:block;margin-top:8px"></small>`,"OPS");
+})();
+
 show7("JUMP");
 newOffers();detail();log("Cold start: igniting reactor and engaging ring drive");rx.st="IGNITING";setInterval(tick,100);tick();
 
@@ -872,7 +921,7 @@ const stg=()=>["CHARGE","ALIGN","OPEN"].includes(sim.stage),T=[
 ["CORE HOT",()=>sim.temp>=16?"rb":sim.temp>12?"a":""],["OVERLOAD",()=>sim.load>sim.out?"rb":""],
 ["SHIELD LOW",()=>shReq()-shEff()>10?"rb":""],["COOLANT LOW",()=>cvNeed()>cvFlow()?"ab":""],
 ["RING RESONANCE",()=>inBand(sim.rim)?"rb":""],["NAV ERROR",()=>navErr()>2?"a":""],
-["EVENT",()=>sim.evn&&sim.evn!=="NONE"?"ab":""]];
+["LOW FUEL",()=>sim.fuel<10?"rb":sim.fuel<25?"a":""]];
 M.forEach((o,i)=>T.push([o.c,()=>o.s==="fault"?"rb":o.s==="offline"?"":o.h<30?"a":"g",()=>pick(i)]));
 ["COIL/CAP","COOLANT","CONTAIN","INJECTOR","FOC/EMT/TUN","OUTPUT","RING SPD","LOAD","CORE TEMP","RESERVOIR","PHASE ERR","RING SETTLE","TUNER CAL"].forEach((l,k)=>T.push(["GATE "+l,(a)=>a[k].ok?"g":stg()?"rb":"a"]));
 ["INJ","CONTAIN","RESERVOIR","FIELD"].forEach((l,k)=>T.push(["IGN "+l,(a,b)=>b[k].ok?"g":"a"]));
@@ -900,7 +949,7 @@ body.edit #cz{display:block}#cz small{display:block;margin:4px 0 8px}
 <script>
 (()=>{const $=i=>document.getElementById(i),B=document.body,KEY="ultrarune-layout-v2";if(!window.SE7)return;
 const nm=k=>k==="mstr"?"Master controls":k;
-const cz=document.createElement("div");cz.id="cz";cz.innerHTML=`<div class="cplate" style="margin-bottom:8px">CUSTOMIZE</div><small>Show or hide panels and resize the wall and columns. Panels stay exactly where they are.</small>
+const cz=document.createElement("div");cz.id="cz";cz.innerHTML=`<div class="cplate" style="margin-bottom:8px">CUSTOMIZE</div><small>Drag a panel by its amber grip bar to move it (wall or any column). Drag a column title to reorder columns. Show/hide panels and resize below.</small>
 <div class="row"><span>Wall height</span><input type="range" id="czh" min="25" max="70" value="46"></div>
 <div class="row"><span>Column width</span><input type="range" id="czw" min="260" max="560" step="10" value="340"></div>
 <div class="row"><label><input type="checkbox" id="czm" checked> Annunciator wall</label></div><div id="czl"></div>
@@ -919,15 +968,69 @@ $("czr").onclick=()=>{apply(DEF);try{localStorage.removeItem(KEY)}catch(e){}};
 ["czh","czw"].forEach(i=>$(i).oninput=()=>{vars();save()});$("czm").onchange=()=>{vars();save()};
 })();
 </script>
+<style id="dragmove">
+.grip{display:none}
+body.edit .grip{display:flex;align-items:center;justify-content:center;position:absolute;left:0;right:0;top:0;height:20px;z-index:4;cursor:grab;font:700 8px Arial;letter-spacing:.2em;color:#201500;background:#ffb347;border-radius:6px 6px 0 0;touch-action:none;user-select:none}
+body.edit section.col>.grip{display:flex!important}
+body.edit #wall section,body.edit #scrB section{padding-top:30px!important}
+body.edit .zone>.cplate{cursor:grab;touch-action:none;user-select:none;outline:1px dashed #ffb347}
+body.edit .zone{min-height:80px;outline:1px dashed #ffffff22;outline-offset:4px}
+body.dragging,body.dragging *{cursor:grabbing!important;user-select:none!important}
+.ph{box-sizing:border-box;border:2px dashed #ffb347;border-radius:7px;background:#ffb34716}
+</style>
+<script>
+(()=>{const $=i=>document.getElementById(i),B=document.body,KEY="ultrarune-order-v1",SE=window.SE7,wall=$("wall"),R=$("scrB");
+if(!SE||!wall||!R)return;
+const zones=()=>[...R.querySelectorAll(":scope>.zone")],zt=z=>z.querySelector(".cplate").textContent;
+const kOf=new Map(Object.entries(SE).map(([k,e])=>[e,k])),ks=c=>[...c.children].map(e=>kOf.get(e)).filter(Boolean);
+const snap=()=>({w:ks(wall),zo:zones().map(zt),z:Object.fromEntries(zones().map(z=>[zt(z),ks(z)]))});
+const apply=o=>{if(!o)return;const zm=Object.fromEntries(zones().map(z=>[zt(z),z]));
+ (o.zo||[]).forEach(t=>zm[t]&&R.appendChild(zm[t]));
+ (o.w||[]).forEach(k=>SE[k]&&wall.appendChild(SE[k]));
+ for(const t in o.z||{})if(zm[t])o.z[t].forEach(k=>SE[k]&&zm[t].appendChild(SE[k]))};
+const DEF=snap(),save=()=>{try{localStorage.setItem(KEY,JSON.stringify(snap()))}catch(e){}};
+try{const s=localStorage.getItem(KEY);if(s)apply(JSON.parse(s))}catch(e){}
+Object.values(SE).forEach(s=>{const g=document.createElement("div");g.className="grip";g.textContent="⠿  DRAG TO MOVE  ⠿";s.prepend(g)});
+const rz=$("czr");if(rz)rz.addEventListener("click",()=>{apply(DEF);try{localStorage.removeItem(KEY)}catch(e){}});
+let d=null;
+function place(x,y){const{el,ph,zone}=d;
+ if(zone){const b=zones().filter(z=>z!==el).find(z=>{const r=z.getBoundingClientRect();return x<r.left+r.width/2});b?R.insertBefore(ph,b):R.appendChild(ph);return}
+ const t=document.elementFromPoint(x,y);if(!t||t===ph||ph.contains(t))return;
+ const c=t.closest("#wall,.zone");if(!c||(c!==wall&&c.parentElement!==R))return;
+ if(t.closest(".cplate")&&c.classList.contains("zone")){c.insertBefore(ph,c.querySelector(".cplate").nextSibling);return}
+ const ss=[...c.children].filter(e=>e.tagName==="SECTION"&&e!==el&&getComputedStyle(e).display!=="none");
+ const s=t.closest("section"),hit=s&&s!==el&&ss.includes(s)?s:null;
+ if(hit){const r=hit.getBoundingClientRect(),side=c===wall&&r.width<wall.clientWidth*.7,bf=side?x<r.left+r.width/2:y<r.top+r.height/2;c.insertBefore(ph,bf?hit:hit.nextSibling);return}
+ const nb=ss.find(e=>{const r=e.getBoundingClientRect();return y<r.top+r.height/2});nb?c.insertBefore(ph,nb):c.appendChild(ph)}
+function start(){const{el}=d,r=el.getBoundingClientRect();d.on=true;d.ph=document.createElement("div");d.ph.className="ph";
+ d.ph.style.height=r.height+"px";d.ph.style.gridColumn=el.classList.contains("mstr")?"1/-1":"auto";
+ el.parentNode.insertBefore(d.ph,el);
+ Object.assign(el.style,{position:"fixed",width:r.width+"px",height:r.height+"px",left:r.left+"px",top:r.top+"px",zIndex:80,pointerEvents:"none",opacity:.85,boxShadow:"0 14px 40px #000"});
+ B.classList.add("dragging");
+ d.tm=setInterval(()=>{[R,wall].forEach(c=>{const b=c.getBoundingClientRect(),k=36;if(d.x<b.left||d.x>b.right||d.y<b.top||d.y>b.bottom)return;
+  const dx=d.x<b.left+k?-12:d.x>b.right-k?12:0,dy=d.y<b.top+k?-12:d.y>b.bottom-k?12:0;if(dx||dy){c.scrollBy(dx,dy);place(d.x,d.y)}})},30)}
+function end(ok){if(!d)return;const{el,ph}=d;clearInterval(d.tm);
+ if(d.on){if(ok&&ph.parentNode)ph.replaceWith(el);else{ph.remove()}
+  ["position","width","height","left","top","zIndex","pointerEvents","opacity","boxShadow"].forEach(p=>el.style[p]="");
+  B.classList.remove("dragging");if(ok)save();
+  const stop=e=>e.stopPropagation();document.addEventListener("click",stop,{capture:true,once:true});setTimeout(()=>document.removeEventListener("click",stop,true),0)}
+ d=null}
+document.addEventListener("pointerdown",e=>{if(!B.classList.contains("edit")||(e.button||0)!==0)return;
+ const g=e.target.closest(".grip,.zone>.cplate");if(!g)return;
+ const el=g.parentElement,r=el.getBoundingClientRect();
+ d={el,zone:el.classList.contains("zone"),dx:e.clientX-r.left,dy:e.clientY-r.top,x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,on:false};e.preventDefault()});
+document.addEventListener("pointermove",e=>{if(!d)return;d.x=e.clientX;d.y=e.clientY;
+ if(!d.on){if(Math.hypot(d.x-d.sx,d.y-d.sy)<5)return;start()}
+ d.el.style.left=(d.x-d.dx)+"px";d.el.style.top=(d.y-d.dy)+"px";place(d.x,d.y)});
+document.addEventListener("pointerup",()=>end(true));document.addEventListener("pointercancel",()=>end(false));
+document.addEventListener("keydown",e=>{if(e.key==="Escape")end(false)});
+})();
+</script>
 <script>
 /* ---- local browser saving: autosave + restore of the whole simulation ---- */
 (function(){
  const KEY="ultrarune.save.v1";let noSave=false;
- const rec=document.getElementById("rec");
- const bar=document.createElement("div");bar.className="btns";
- bar.innerHTML='<button class="pb grn" id="svNow">Save now</button><button class="pb red" id="svNew">New game</button>';
- const st=document.createElement("small");st.id="saveSt";st.style.cssText="display:block;margin-top:8px;opacity:.8";
- rec.appendChild(bar);rec.appendChild(st);
+ const st=document.getElementById("saveSt");try{localStorage.removeItem("ultrarune.ach")}catch(e){}
  const hhmm=t=>new Date(t).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
  function save(manual){
   if(noSave)return;
